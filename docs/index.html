@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IL Urbanist Witness Slip Tracker</title>
+<title>Illinois Witness Slip Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -275,6 +275,16 @@ a:hover{text-decoration:underline}
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ── How-to collapsible ─────────────────────────────────────────── */
+.how-to{background:var(--surface);border:1px solid var(--divider);border-radius:var(--r-lg);margin-bottom:1.25rem;overflow:hidden}
+.how-to summary{padding:.75rem 1rem;font-size:.875rem;font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem;color:var(--text)}
+.how-to summary::-webkit-details-marker{display:none}
+.how-to[open] summary{border-bottom:1px solid var(--divider)}
+.how-to-body{padding:1rem 1.1rem;font-size:.875rem;color:var(--text-muted);display:flex;flex-direction:column;gap:.75rem}
+.how-to-body ol{padding-left:1.25rem;display:flex;flex-direction:column;gap:.4rem}
+.how-to-body ul{padding-left:1.25rem;margin-top:.3rem;display:flex;flex-direction:column;gap:.2rem}
+.how-to-tip{background:var(--surface-offset);border-radius:var(--r-md);padding:.6rem .8rem}
+.hero-attribution{font-size:.82rem;color:var(--text-muted);margin-top:.5rem;max-width:58ch}
 /* ── Footer ─────────────────────────────────────────────────────── */
 footer{
   border-top:1px solid var(--divider);padding:1.5rem 0;
@@ -307,7 +317,7 @@ footer a:hover{color:var(--primary)}
       <path d="M9 19 L13 10 L16 15 L19 10" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       <path d="M6 14 h5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
     </svg>
-    IL Urbanist Witness Slip Tracker
+    Illinois Witness Slip Tracker
   </div>
   <div class="header-actions">
     <button class="btn-notify" id="notifyBtn" title="Get browser notifications when new slips open">
@@ -323,9 +333,10 @@ footer a:hover{color:var(--primary)}
 <!-- ── Main ────────────────────────────────────────────────────── -->
 <main class="container">
   <section class="hero">
-    <p class="hero-kicker">Chicago / Illinois · 104th General Assembly</p>
-    <h1>Urbanist bills need<br><em>your</em> voice in committee.</h1>
-    <p>Track Illinois bills on Housing, Biking, Safe Streets &amp; Transit. Get notified the moment a committee hearing is scheduled — then file your witness slip in one click.</p>
+    <p class="hero-kicker">Illinois · 104th General Assembly</p>
+    <h1>Illinois Witness Slip Tracker</h1>
+    <p>Track Illinois bills on Housing, Biking, Safe Streets &amp; Transit. When a committee hearing opens, a witness slip is your fastest way to go on record — this page links you directly to ILGA where you can file in about 2 minutes.</p>
+    <p class="hero-attribution">The pre-loaded bill list reflects priorities from <a href="https://www.strongtownschicago.org/witness-slips" target="_blank" rel="noopener">Strong Towns Chicago</a> — you can add any Illinois bill using the field below.</p>
   </section>
 
   <!-- Status bar -->
@@ -342,6 +353,28 @@ footer a:hover{color:var(--primary)}
       <div class="banner-sub" id="bannerSub"></div>
     </div>
   </div>
+
+  <!-- How to file a witness slip -->
+  <details class="how-to" id="howTo">
+    <summary>📋 How to file a witness slip</summary>
+    <div class="how-to-body">
+      <p>A witness slip is a quick, formal way to tell your state legislators where you stand on a bill before it comes to a vote. <strong>Anyone can file one</strong> — you don't need to be a constituent of the sponsor or from the district.</p>
+      <ol>
+        <li>Click <strong>"Go to ILGA witness slip page"</strong> on any bill. If a hearing is scheduled, you'll see it on the ILGA page's <strong>Witness Slips</strong> tab.</li>
+        <li>Click <strong>Create a Witness Slip</strong> and fill in the short form. Key fields:
+          <ul>
+            <li><strong>Firm/Business:</strong> Self</li>
+            <li><strong>Title:</strong> N/A</li>
+            <li><strong>Representation:</strong> Self</li>
+            <li><strong>Testimony:</strong> Record of Appearance Only</li>
+            <li><strong>Position:</strong> Proponent (support) or Opponent (oppose) — check the card for each bill's recommended stance</li>
+          </ul>
+        </li>
+        <li>Submit. That's it — your position is now part of the official legislative record.</li>
+      </ol>
+      <p class="how-to-tip">💡 <strong>Pro tip:</strong> Create a free <a href="https://my.ilga.gov" target="_blank" rel="noopener">MyILGA account</a> first so your info is saved for future slips. See also: <a href="https://www.strongtownschicago.org/witness-slips" target="_blank" rel="noopener">Strong Towns Chicago's guide</a>.</p>
+    </div>
+  </details>
 
   <!-- Toolbar -->
   <div class="toolbar">
@@ -381,7 +414,7 @@ footer a:hover{color:var(--primary)}
 <footer class="container">
   <span>Data from <a href="https://ilga.gov" target="_blank" rel="noopener">ILGA.gov</a> &amp; <a href="https://openstates.org" target="_blank" rel="noopener">OpenStates</a> via <a href="https://github.com/chihacknight/govbot/tree/il-witness-slip-poc" target="_blank" rel="noopener">govbot</a></span>
   <span class="footer-spacer"></span>
-  <span>Curated by <a href="https://www.strongtownschicago.org/witness-slips" target="_blank" rel="noopener">Strong Towns Chicago</a></span>
+  <span>Priority bills sourced from <a href="https://www.strongtownschicago.org/witness-slips" target="_blank" rel="noopener">Strong Towns Chicago</a></span>
 </footer>
 
 <div id="toast" role="status" aria-live="polite"></div>
