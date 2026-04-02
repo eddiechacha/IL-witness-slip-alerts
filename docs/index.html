@@ -470,7 +470,8 @@ function updateStatusBar(){
   if(age < 30){ dot.className='status-dot live'; }
   else{ dot.className='status-dot stale'; }
   const urgentCount = allBills.filter(b=>b.committee_hearing_date).length;
-  txt.textContent = `Updated ${dateStr}${urgentCount ? ' · ' + urgentCount + ' bill' + (urgentCount>1?'s':'') + ' with hearings' : ' · ' + allBills.length + ' bills tracked'}`;
+  const staleNote = age >= 30 ? ' · data may be stale' : '';
+  txt.innerHTML = `Updated ${dateStr}${urgentCount ? ' · <strong>' + urgentCount + ' bill' + (urgentCount>1?'s':'') + ' with hearings</strong>' : ' · ' + allBills.length + ' bills tracked'}${staleNote} · <a href="https://github.com/govbot-openstates-scrapers/il-legislation" target="_blank" rel="noopener" style="color:var(--text-muted)">source: OpenStates via govbot</a> (updated once daily)`;
 }
 
 // ── Rendering ─────────────────────────────────────────────────────

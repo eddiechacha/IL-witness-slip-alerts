@@ -2,7 +2,7 @@ name: Update Witness Slip Data
 
 on:
   schedule:
-    - cron: '0 12 * * *'   # daily at noon UTC
+    - cron: '0 14 * * *'   # daily at 2pm UTC (9am CT) — after OpenStates updates
   workflow_dispatch:         # allow manual trigger
 
 permissions:
@@ -30,19 +30,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python witness_slip_notifier.py --mode github-action --sample
-          python - <<'PYEOF'
-          import json, datetime
-          with open('witness_slip_notifications.json') as f:
-              bills = json.load(f)
-          out = {"generated_at": datetime.datetime.utcnow().isoformat()+"Z", "bills": bills}
-          with open('docs/data/bills.json','w') as f:
-              json.dump(out, f, indent=2)
+          python3 - <<'PYEOF'
+          import json, datetime, pathlib
+          src = pathlib.Path('witness_slip_notifications.json')
+          bills = json.loads(src.read_text()) if src.exists() else []
+          out = {
+              "generated_at": datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+              "source_note": "Bill data sourced from govbot-openstates-scrapers/il-legislation (OpenStates). Updated once daily.",
+              "bills": bills
+          }
+          pathlib.Path('docs/data').mkdir(parents=True, exist_ok=True)
+          pathlib.Path('docs/data/bills.json').write_text(json.dumps(out, indent=2, ensure_ascii=False))
+          print(f'Wrote docs/data/bills.json ({len(bills)} bills)')
           PYEOF
 
       - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/bills.json
+          git add -f docs/data/bills.json
           git diff --staged --quiet || git commit -m "chore: update bills.json [skip ci]"
           git push
