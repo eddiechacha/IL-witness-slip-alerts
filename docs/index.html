@@ -100,6 +100,29 @@ a:hover{text-decoration:underline}
 .banner-title{font-weight:700;font-size:.95rem;color:var(--text);margin-bottom:.2rem}
 .banner-sub{font-size:.825rem;color:var(--text-muted)}
 
+/* ── Session status banner ──────────────────────────────────────── */
+.session-banner{
+  display:none;align-items:flex-start;gap:.75rem;
+  padding:.85rem 1.1rem;border-radius:var(--r-lg);margin-bottom:1.25rem;
+  font-size:.875rem;font-weight:500;border:1px solid;
+}
+.session-banner.session-active{
+  background:var(--success-hl);
+  border-color:color-mix(in oklch,var(--success) 30%,transparent);
+  color:var(--text);
+}
+.session-banner.session-recess{
+  background:var(--surface-offset);
+  border-color:var(--divider);
+  color:var(--text-muted);
+}
+.session-banner.session-unknown{
+  background:var(--warning-hl);
+  border-color:color-mix(in oklch,var(--warning) 30%,transparent);
+  color:var(--text);
+}
+.session-icon{font-size:1.1rem;flex-shrink:0}
+
 /* ── Search / add ───────────────────────────────────────────────── */
 .toolbar{
   display:flex;gap:.6rem;margin-bottom:1.5rem;flex-wrap:wrap;
@@ -424,6 +447,9 @@ footer a:hover{color:var(--primary)}
     </div>
   </details>
 
+  <!-- Session status banner -->
+  <div id="sessionBanner" class="session-banner" style="display:none" role="status" aria-live="polite"></div>
+
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="search-wrap">
@@ -529,6 +555,24 @@ async function loadData(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     allBills = data.bills || [];
+
+          // ── Session status banner ──────────────────────────────────────
+          const sessionStatus  = data.session_status  || 'unknown';
+          const sessionMessage = data.session_message || '';
+          const sessionBanner  = document.getElementById('sessionBanner');
+          if (sessionBanner && sessionMessage) {
+            if (sessionStatus === 'active') {
+              sessionBanner.className = 'session-banner session-active';
+              sessionBanner.innerHTML = `<span class="session-icon">🏛️</span> ${sessionMessage}`;
+            } else if (sessionStatus === 'recess' || sessionStatus === 'just_ended') {
+              sessionBanner.className = 'session-banner session-recess';
+              sessionBanner.innerHTML = `<span class="session-icon">💤</span> ${sessionMessage}`;
+            } else {
+              sessionBanner.className = 'session-banner session-unknown';
+              sessionBanner.innerHTML = `<span class="session-icon">❓</span> ${sessionMessage}`;
+            }
+            sessionBanner.style.display = 'flex';
+          }
     generatedAt = data.generated_at || null;
     updateStatusBar();
     renderAll();
