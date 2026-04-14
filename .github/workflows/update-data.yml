@@ -2,7 +2,8 @@ name: Update Witness Slip Data
 
 on:
   schedule:
-    - cron: '0 14 * * *'   # daily at 2pm UTC (9am CT) — after OpenStates updates
+    - cron: '0 13 * * *'   # 8am CT (13:00 UTC) — before session starts
+    - cron: '0 23 * * *'   # 6pm CT (23:00 UTC) — after session ends
   workflow_dispatch:         # allow manual trigger
 
 permissions:
@@ -31,17 +32,112 @@ jobs:
         run: |
           python witness_slip_notifier.py --mode github-action
           python3 - <<'PYEOF'
-          import json, datetime, pathlib
+          import json, datetime, pathlib, urllib.request, re, ast
+
+          # ── Load base bill output from notifier ────────────────────────
           src = pathlib.Path('witness_slip_notifications.json')
           bills = json.loads(src.read_text()) if src.exists() else []
+
+          # ── Auto-sync STC tracked bills from govbot repo ───────────────
+          # Fetches STC_TRACKED_BILLS directly from the il-witness-slip-poc
+          # branch so the site reflects STC's live priority list automatically.
+          STC_TRACKED_BILLS = {}
+          try:
+              raw_url = (
+                  'https://raw.githubusercontent.com/chihacknight/govbot/'
+                  'il-witness-slip-poc/witness_slip_notifier.py'
+              )
+              with urllib.request.urlopen(raw_url, timeout=10) as r:
+                  source = r.read().decode()
+              m = re.search(
+                  r'STC_TRACKED_BILLS\s*=\s*(\{.*?^\})',
+                  source, re.S | re.M
+              )
+              if m:
+                  STC_TRACKED_BILLS = ast.literal_eval(m.group(1))
+                  print(f'Auto-synced {len(STC_TRACKED_BILLS)} STC bills from govbot')
+              else:
+                  print('WARNING: Could not parse STC_TRACKED_BILLS from govbot source')
+          except Exception as e:
+              print(f'WARNING: STC auto-sync failed ({e}), using notifier output only')
+
+          # Merge — add any STC bills not already in the list
+          existing_nums = {b['bill_number'] for b in bills}
+          for bill_num, (cat, desc, stance) in STC_TRACKED_BILLS.items():
+              if bill_num not in existing_nums:
+                  doc_type = 'HB' if bill_num.startswith('H') else 'SB'
+                  num_only = re.sub(r'[^\d]', '', bill_num)
+                  bills.append({
+                      'bill_number': bill_num,
+                      'chamber': 'House' if bill_num.startswith('H') else 'Senate',
+                      'title': desc,
+                      'category': cat,
+                      'stance': stance,
+                      'witness_slip_url': (
+                          f'https://www.ilga.gov/legislation/BillStatus.asp'
+                          f'?DocTypeID={doc_type}&DocNum={num_only}'
+                          f'&GAID=18&SessionID=114#tab=witnessSlips'
+                      ),
+                      'committee_hearing_date': None,
+                      'committee_name': None,
+                      'source': 'stc_tracked',
+                  })
+          print(f'Total bills after STC sync: {len(bills)}')
+
+          # ── Illinois legislative session status ────────────────────────
+          # 104th GA: spring session Jan–May, veto session ~Nov 10–20.
+          # Outside those windows we flag "unknown" (not "closed") to
+          # account for emergency/special sessions.
+          now_utc = datetime.datetime.utcnow()
+          now_ct  = now_utc + datetime.timedelta(hours=-5)  # approx CDT
+          month, day = now_ct.month, now_ct.day
+
+          if 1 <= month <= 5:
+              session_status  = 'active'
+              session_message = ('Spring session is active (Jan–May). '
+                  'Legislators are in Springfield — your witness slip matters now!')
+          elif month == 11 and 10 <= day <= 20:
+              session_status  = 'active'
+              session_message = ('Veto session is active (Nov 10–20). '
+                  'Legislators are in Springfield — file your slip!')
+          elif month == 6 and day <= 7:
+              session_status  = 'just_ended'
+              session_message = ('Spring session just ended. No new witness slips '
+                  'until fall veto session (approx. Nov 10–20).')
+          elif 6 <= month <= 10:
+              session_status  = 'recess'
+              session_message = ('Legislature is in summer recess. '
+                  'Next opportunity: veto session in November. '
+                  'You can still review bills and prepare your slip.')
+          elif month == 11 and day > 20:
+              session_status  = 'recess'
+              session_message = ('Veto session has ended. '
+                  'Legislature returns for spring session in January.')
+          elif month == 12:
+              session_status  = 'recess'
+              session_message = ('Legislature is in winter recess. '
+                  'Spring session begins in January.')
+          else:
+              session_status  = 'unknown'
+              session_message = ('Session status uncertain — an emergency or special '
+                  'session may be in progress. Check ilga.gov for the current calendar.')
+
           out = {
-              "generated_at": datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
-              "source_note": "Bill data sourced from govbot-openstates-scrapers/il-legislation (OpenStates). Updated once daily.",
-              "bills": bills
+              'generated_at': now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'source_note': (
+                  'Bill data from OpenStates via govbot. '
+                  'STC priority list auto-synced from chihacknight/govbot. '
+                  'Updated twice daily (8am & 6pm CT).'
+              ),
+              'session_status':  session_status,
+              'session_message': session_message,
+              'bills': bills,
           }
           pathlib.Path('docs/data').mkdir(parents=True, exist_ok=True)
-          pathlib.Path('docs/data/bills.json').write_text(json.dumps(out, indent=2, ensure_ascii=False))
-          print(f'Wrote docs/data/bills.json ({len(bills)} bills)')
+          pathlib.Path('docs/data/bills.json').write_text(
+              json.dumps(out, indent=2, ensure_ascii=False)
+          )
+          print(f'Wrote docs/data/bills.json ({len(bills)} bills, session={session_status})')
           PYEOF
 
       - name: Commit updated data
