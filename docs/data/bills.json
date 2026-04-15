@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-14T23:37:05Z",
+  "generated_at": "2026-04-15T14:28:50Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "active",
   "session_message": "Spring session is active (Jan–May). Legislators are in Springfield — your witness slip matters now!",
@@ -12,17 +12,6 @@
       "stance": "Proponent",
       "witness_slip_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=5198&GAID=18&SessionID=114#tab=witnessSlips",
       "committee_hearing_date": "2026-04-15T10:00:00",
-      "committee_name": null,
-      "source": "stc_tracked"
-    },
-    {
-      "bill_number": "HB4759",
-      "chamber": "House",
-      "title": "Green Light for Buses — transit signal priority",
-      "category": "Transit",
-      "stance": "Proponent",
-      "witness_slip_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=4759&GAID=18&SessionID=114#tab=witnessSlips",
-      "committee_hearing_date": "2026-04-14T14:00:00",
       "committee_name": null,
       "source": "stc_tracked"
     }
