@@ -334,365 +334,924 @@ class OpenStatesParser:
     def parse_data_directory(data_dir: str) -> List[Bill]:
         print(f"📂 Parsing OpenStates data from: {data_dir}")
         data_path = Path(data_dir)
-
+        
         if not data_path.exists():
             print(f"❌ Data directory not found: {data_dir}")
             return []
-
-        # govbot-openstates-scrapers layout: flat bill_<uuid>.json files
-        # Legacy govbot layout: subdirectories each containing metadata.json
-        flat_files = list(data_path.glob("bill_*.json"))
-        nested_files = list(data_path.glob("*/metadata.json"))
-        bill_files = flat_files if flat_files else nested_files
-        flat_mode = bool(flat_files)
-
+        
         bills = []
+        # Each bill lives in its own subdirectory with a metadata.json.
+        # That single file contains the bill's title, subjects, actions,
+        # sponsorships, and ILGA source URL — everything we need.
+        # The other JSON files under each bill dir are govbot log-event
+        # files; they contain no subject/category data and should be skipped.
+        bill_files = list(data_path.glob("*/metadata.json"))
 
-        print(f"📄 Found {len(bill_files)} bills ({'flat uuid files' if flat_mode else 'nested metadata files'})")
+        print(f"📄 Found {len(bill_files)} bills (metadata.json files)")
+
         for bill_file in bill_files:
+            
             try:
                 with open(bill_file, 'r') as f:
-                    bill_data = json.load(f)
-                bill = OpenStatesParser._parse_bill_json(bill_data)
-                if bill:
-                    bills.append(bill)
+                    data = json.load(f)
+                    
+                    if isinstance(data, list):
+                        for bill_data in data:
+                            bill = OpenStatesParser._parse_bill(bill_data)
+                            if bill:
+                                bills.append(bill)
+                    else:
+                        bill = OpenStatesParser._parse_bill(data)
+                        if bill:
+                            bills.append(bill)
             except Exception as e:
-                print(f"⚠️  Error parsing {bill_file}: {e}")
+                print(f"⚠️  Error parsing {bill_file.name}: {e}")
                 continue
         
-        print(f"✅ Parsed {len(bills)} unique bills")
-        return bills
-
+        # Deduplicate
+        seen = set()
+        unique_bills = []
+        for bill in bills:
+            if bill.bill_number not in seen:
+                seen.add(bill.bill_number)
+                unique_bills.append(bill)
+        
+        print(f"✅ Parsed {len(unique_bills)} unique bills")
+        return unique_bills
+    
     @staticmethod
-    def _parse_bill_json( dict) -> Optional[Bill]:
-        """Parse a single bill JSON file from govbot-openstates-scrapers.
-
-        Supported layouts:
-          1) Flat snapshot from `govbot build`: bill fields are at top level.
-          2) OpenStates-like JSON: bill.title, bill.identifier, bill.subjects,
-             bill.openstates_url, bill.next_action, bill.sponsors, etc.
-          3) Legacy nested maps used by earlier prototype scripts.
-        """
+    def _parse_bill(bill_data: dict) -> Optional[Bill]:
+        """Parse OpenStates JSON format"""
         try:
-            import re
-
-            # Helpers ---------------------------------------------------------
-            def first_text(x, *keys):
-                """Return first matching key value as string, or ''.
-
-                Searches dict keys in order, allowing nested lookups if value
-                is a dict with the next key, but only one level deep.
-                """
-                for k in keys:
-                    if isinstance(x, dict) and k in x:
-                        v = x[k]
-                        if v is None:
-                            continue
-                        if isinstance(v, str):
-                            return v
-                        if isinstance(v, (int, float)):
-                            return str(v)
-                        if isinstance(v, dict):
-                            # common nested shapes: {label: ...}, {name: ...}
-                            for kk in ('label', 'name', 'title', 'text', 'value'):
-                                if kk in v and v[kk]:
-                                    return str(v[kk])
-                        if isinstance(v, list) and v:
-                            # for sponsor lists etc.
-                            return first_text(v[0], 'name', 'title', 'label', 'text')
-                return ''
-
-            def as_list(v):
-                if v is None:
-                    return []
-                if isinstance(v, list):
-                    return v
-                if isinstance(v, dict):
-                    return list(v.values())
-                return [v]
-
-            def normalize_bill_number(raw: str) -> Optional[str]:
-                if not raw:
-                    return None
-                m = re.search(r'\b([HS][BCR]\d+)\b', raw, re.I)
-                return m.group(1).upper() if m else None
-
-            # --- extract identifiers and title --------------------------------
-            bill_number = (
-                first_text(data, 'identifier') or
-                first_text(data, 'bill_number') or
-                first_text(data, 'billNumber') or
-                first_text(data, 'number') or
-                normalize_bill_number(first_text(data, 'title')) or
-                normalize_bill_number(first_text(data, 'name'))
-            )
-            if not bill_number:
+            identifier = bill_data.get('identifier') or bill_data.get('bill_id')
+            if not identifier:
                 return None
-
-            title = (
-                first_text(data, 'title') or
-                first_text(data, 'bill_title') or
-                first_text(data, 'short_title') or
-                first_text(data, 'name') or
-                bill_number
-            )
-
-            chamber = Chamber.HOUSE if bill_number.startswith('H') else Chamber.SENATE
-
-            # --- sponsors -----------------------------------------------------
-            sponsor = first_text(data, 'sponsor') or first_text(data, 'primary_sponsor') or 'Unknown'
-            if sponsor == 'Unknown':
-                sponsors = as_list(data.get('sponsors') or data.get('primary_sponsors'))
-                if sponsors:
-                    sponsor = first_text(sponsors[0], 'name', 'title')
-
-            # --- subjects / tags ---------------------------------------------
-            subjects = []
-            for key in ('subjects', 'subject', 'topics', 'tags', 'categories'):
-                v = data.get(key)
-                if not v:
-                    continue
-                for item in as_list(v):
-                    if isinstance(item, str):
-                        subjects.append(item)
-                    elif isinstance(item, dict):
-                        txt = first_text(item, 'name', 'title', 'label', 'text')
-                        if txt:
-                            subjects.append(txt)
-            # dedupe while preserving order
-            seen_sub = set()
-            subjects = [s for s in subjects if not (s in seen_sub or seen_sub.add(s))]
-
-            # --- next reading / action ---------------------------------------
+            
+            # Chamber
+            # from_organization is either a dict {classification: ...} or
+            # an OpenStates lazy-ref string like '~{"classification": "lower"}'.
+            # We also fall back to the bill identifier prefix (HB/SB).
+            from_org = bill_data.get('from_organization', {})
+            if isinstance(from_org, str):
+                chamber_str = from_org  # the string itself contains 'upper'/'lower'
+            elif isinstance(from_org, dict):
+                chamber_str = from_org.get('classification', '')
+            else:
+                chamber_str = ''
+            if 'upper' in chamber_str.lower() or 'senate' in chamber_str.lower() or str(identifier).upper().startswith('S'):
+                chamber = Chamber.SENATE
+            else:
+                chamber = Chamber.HOUSE
+            
+            # Title
+            title = bill_data.get('title', 'Unknown')
+            if isinstance(title, list):
+                title = title[0] if title else 'Unknown'
+            
+            # Sponsor
+            sponsors = bill_data.get('sponsorships', [])
+            sponsor = "Unknown"
+            if sponsors:
+                primary = next((s for s in sponsors if s.get('primary')), sponsors[0])
+                sponsor = primary.get('name', 'Unknown')
+            
+            # **SUBJECTS - from OpenStates source data**
+            subjects = bill_data.get('subject', [])
+            if isinstance(subjects, str):
+                subjects = [subjects]
+            
+            # Reading stage
             next_reading = BillReading.FIRST
-            next_action = data.get('next_action') or data.get('latest_action') or data.get('action') or {}
-            if isinstance(next_action, dict):
-                action_desc = (
-                    first_text(next_action, 'description') or
-                    first_text(next_action, 'action') or
-                    first_text(next_action, 'title') or
-                    ''
-                ).lower()
-                if 'third reading' in action_desc:
+            actions = bill_data.get('actions', [])
+            for action in reversed(actions):
+                desc = action.get('description', '').lower()
+                if 'third reading' in desc:
                     next_reading = BillReading.THIRD
-                elif 'second reading' in action_desc:
-                    next_reading = BillReading.SECOND
-
-            # --- committee hearing date --------------------------------------
-            committee_hearing_date = None
-            committee_name = None
-            for key in ('committee_hearing_date', 'hearing_date', 'scheduled_date', 'date'):
-                raw = first_text(data, key)
-                if not raw:
-                    continue
-                for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d'):
-                    try:
-                        committee_hearing_date = datetime.strptime(raw.replace('Z', ''), fmt)
-                        break
-                    except ValueError:
-                        continue
-                if committee_hearing_date:
                     break
-            if isinstance(next_action, dict):
-                committee_name = first_text(next_action, 'committee', 'committee_name', 'committeeTitle')
-                if not committee_name:
-                    committee_name = first_text(next_action.get('committee') or {}, 'name', 'title', 'label')
+                elif 'second reading' in desc:
+                    next_reading = BillReading.SECOND
+                    break
 
-            # --- ILGA url -----------------------------------------------------
-            ilga_url = (
-                first_text(data, 'ilga_url') or
-                first_text(data, 'openstates_url') or
-                first_text(data, 'url') or
-                "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=" +
-                ('HB' if chamber == Chamber.HOUSE else 'SB') +
-                "&DocNum=" + re.sub(r'[^\d]', '', bill_number) +
-                "&GAID=18&SessionID=114"
-            )
+            # Committee info — find most recent referral/assignment action
+            committee_date = None
+            committee_name = None
+            committee_keywords = ('assigned to', 'referred to', 're-referred to',
+                                  'added to', 'placed on')
+            for action in reversed(actions):
+                desc = action.get('description', '')
+                desc_lower = desc.lower()
+                if any(kw in desc_lower for kw in committee_keywords):
+                    committee_name = desc
+                    date_str = action.get('date', '')
+                    if date_str:
+                        try:
+                            committee_date = datetime.strptime(date_str[:10], '%Y-%m-%d')
+                        except ValueError:
+                            pass
+                    break
 
+            # ILGA source URL
+            ilga_url = None
+            for src in bill_data.get('sources', []):
+                url = src.get('url', '') if isinstance(src, dict) else str(src)
+                if 'ilga.gov' in url:
+                    ilga_url = url
+                    break
+
+            
             return Bill(
-                bill_number=bill_number,
+                bill_number=identifier,
                 chamber=chamber,
                 title=title,
                 sponsor=sponsor,
                 next_reading=next_reading,
                 subjects=subjects,
-                committee_hearing_date=committee_hearing_date,
+                committee_hearing_date=committee_date,
                 committee_name=committee_name,
-                ilga_url=ilga_url,
+                ilga_url=ilga_url
             )
+        
         except Exception as e:
             print(f"⚠️  Error parsing bill: {e}")
             return None
-
     @staticmethod
     def scrape_ilga_bill_hearings() -> dict:
-        """Scrape upcoming bill hearings from active ILGA committee hearing pages.
+        """Scrape upcoming bill hearings from ILGA's Schedules/Legislation pages.
 
-        Strategy:
-          1. Fetch House and Senate committee index pages.
-          2. Parse committee codes from committee tables, preferring rows marked
-             Scheduled.
-          3. Build committee hearing pages from those codes.
-          4. Fetch hearing detail pages linked from each committee page.
-          5. Scan detail-page HTML for dates/times and bill identifiers.
-          6. Fall back to known live detail pages if discovery finds nothing.
+        Returns a dict of {bill_number_upper: datetime} mapping each bill that
+        has a scheduled committee hearing to its next hearing date/time.
+
+        ILGA publishes two clean tables at:
+          https://ilga.gov/House/Schedules/Legislation
+          https://ilga.gov/Senate/Schedules/Legislation
+
+        Each row contains the bill number, committee name, date, and time —
+        scraped directly so no fuzzy committee-name matching is needed.
         """
         import re
+        bill_hearings = {}  # bill_number -> datetime
 
-        bill_hearings = {}
-        headers = {'User-Agent': 'govbot-urbanist/1.0'}
-
-        detail_href_re = re.compile(
-            r'href=["\']([^"\']*/hearings/details/[^"\']+)["\']',
-            re.I,
-        )
+        # Matches e.g. "04/07/2026" or "4/7/2026" with optional time "2:00PM"
         date_re = re.compile(
-            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?',
-            re.I,
-        )
-        bill_re = re.compile(r'([HS][BCR]\s*\d+)', re.I)
-        table_row_re = re.compile(r'^\|([^|]+)\|([A-Z][A-Z0-9-]+)\|([^|]+)\|?$', re.M)
-        compact_row_re = re.compile(r'Code:\s*([A-Z][A-Z0-9-]+).*?Hearings:\s*([^|\n]+)', re.S)
+            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?', re.I)
+        # Matches bill identifiers like HB1234, SB567, HR12, SR3
+        bill_re = re.compile(r'\b([HS][BCR]\d+)\b', re.I)
 
-        committee_index_urls = [
-            ('Senate', 'https://www.ilga.gov/Senate/Committees'),
-            ('House', 'https://www.ilga.gov/House/Committees'),
-        ]
-        seeded_detail_urls = [
-            'https://www.ilga.gov/House/Hearings/details/3057/22868',
-            'https://www.ilga.gov/House/Hearings/details/3095/22870',
-            'https://www.ilga.gov/House/Committees/Hearings/3098',
-            'https://www.ilga.gov/Senate/Committees/Hearings/SEXC',
-        ]
-
-        committee_pages = []
-        seen_committee_pages = set()
-
-        for chamber, index_url in committee_index_urls:
+        for chamber in ('House', 'Senate'):
+            url = f'https://ilga.gov/{chamber}/Schedules/Legislation'
             try:
-                resp = requests.get(index_url, timeout=20, headers=headers)
+                resp = requests.get(url, timeout=20,
+                                    headers={'User-Agent': 'govbot-urbanist/1.0'})
                 resp.raise_for_status()
             except Exception as e:
-                print(f'   ⚠️  Could not fetch {index_url}: {e}')
+                print(f'   ⚠️  Could not fetch {url}: {e}')
                 continue
 
-            scheduled_codes = []
-            all_codes = []
-
-            for match in table_row_re.finditer(resp.text):
-                code = match.group(2).strip().upper()
-                status = match.group(3).strip().lower()
-                if code in {'CODE', 'NAME'}:
+            # The page is an HTML table. Walk every line looking for bill IDs
+            # adjacent to a date. ILGA's table has bill number and date in the
+            # same <tr>, so we accumulate context within a small window.
+            lines = resp.text.splitlines()
+            for i, line in enumerate(lines):
+                bm = bill_re.search(line)
+                if not bm:
                     continue
-                all_codes.append(code)
-                if 'scheduled' in status:
-                    scheduled_codes.append(code)
-
-            if not all_codes:
-                for cm in compact_row_re.finditer(resp.text):
-                    code = cm.group(1).strip().upper()
-                    status = cm.group(2).strip().lower()
-                    if code:
-                        all_codes.append(code)
-                        if 'scheduled' in status:
-                            scheduled_codes.append(code)
-
-            selected_codes = scheduled_codes or all_codes
-            print(
-                f'   {chamber}: parsed {len(all_codes)} committees '
-                f'({len(scheduled_codes)} scheduled, using {len(selected_codes)})'
-            )
-
-            for code in selected_codes:
-                if not code.startswith(('H', 'S')):
+                bill_id = bm.group(1).upper()
+                # Look for a date in the same line or the next 5 lines
+                window = ' '.join(lines[i:i+6])
+                dm = date_re.search(window)
+                if not dm:
                     continue
-                committee_url = f'https://www.ilga.gov/{chamber}/Committees/Hearings/{code}'
-                if committee_url not in seen_committee_pages:
-                    seen_committee_pages.add(committee_url)
-                    committee_pages.append(committee_url)
-
-        print(f'   Discovered {len(committee_pages)} committee hearing pages')
-
-        seen_detail_urls = set()
-        detail_urls = []
-
-        for committee_url in committee_pages:
-            try:
-                resp = requests.get(committee_url, timeout=20, headers=headers)
-                resp.raise_for_status()
-            except Exception as e:
-                print(f'   ⚠️  Could not fetch committee page {committee_url}: {e}')
-                continue
-
-            for href in detail_href_re.findall(resp.text):
-                detail_url = href if href.startswith('http') else f'https://www.ilga.gov{href}'
-                if detail_url not in seen_detail_urls:
-                    seen_detail_urls.add(detail_url)
-                    detail_urls.append(detail_url)
-
-            if not detail_href_re.search(resp.text):
-                detail_urls.append(committee_url)
-
-        print(f'   Discovered {len(detail_urls)} hearing detail pages from committees')
-
-        if not detail_urls:
-            print('   ⚠️  No hearing detail pages discovered; using seeded fallback URLs')
-            for url in seeded_detail_urls:
-                if url not in seen_detail_urls:
-                    seen_detail_urls.add(url)
-                    detail_urls.append(url)
-
-        for detail_url in detail_urls:
-            try:
-                dresp = requests.get(detail_url, timeout=20, headers=headers)
-                dresp.raise_for_status()
-            except Exception as e:
-                print(f'   ⚠️  Could not fetch hearing detail {detail_url}: {e}')
-                continue
-
-            detail_text = dresp.text
-            dm = date_re.search(detail_text)
-            if not dm:
-                print(f'   ⚠️  No date found on hearing detail {detail_url}')
-                continue
-
-            date_str = dm.group(1)
-            time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
-            try:
-                dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
-            except ValueError:
+                date_str = dm.group(1)
+                time_str = dm.group(2) or '12:00 PM'
                 try:
-                    dt = datetime.strptime(date_str, '%m/%d/%Y')
+                    dt = datetime.strptime(
+                        f'{date_str} {time_str.replace(" ", "")}',
+                        '%m/%d/%Y %I:%M%p'
+                    )
                 except ValueError:
-                    print(f'   ⚠️  Could not parse hearing date on {detail_url}: {date_str} {time_str}')
-                    continue
-
-            matched_bill_count = 0
-            for bill_match in bill_re.finditer(detail_text):
-                bill_id = re.sub(r'\s+', '', bill_match.group(1).upper())
+                    try:
+                        dt = datetime.strptime(date_str, '%m/%d/%Y')
+                    except ValueError:
+                        continue
+                # Keep earliest upcoming hearing per bill
                 if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
                     bill_hearings[bill_id] = dt
-                matched_bill_count += 1
 
-            print(
-                f'   📄 {detail_url} -> {matched_bill_count} bill refs '
-                f'for {dt.strftime("%b %-d %I:%M%p")}'
-            )
-
-        print(f'   Parsed {len(bill_hearings)} unique bills from hearing calendar')
         return bill_hearings
-    
-def write_notifier_output_files(bills_payload) -> None:
-    """Write stable JSON handoff files for GitHub Actions."""
-    payload = bills_payload or []
-    Path('docs/data').mkdir(parents=True, exist_ok=True)
-    Path('witness_slip_notifications.json').write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False)
-    )
-    Path('docs/data/bills.source.json').write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False)
-    )
-    print(f"✅ Wrote witness_slip_notifications.json ({len(payload)} bills)")
-    print(f"✅ Wrote docs/data/bills.source.json ({len(payload)} bills)")
 
-    # Optionally verify witness slip is open on ILGA
+    @staticmethod
+    def check_slip_open(ilga_url: str) -> bool:
+        """Return True if ILGA's BillStatus page shows an active witness slip form.
+
+        The Witness Slips tab on ILGA only contains a form/table when slips are
+        open for that bill. We do a lightweight GET and look for the tell-tale
+        'Create Slip' link or the witness slip form action URL.
+        """
+        if not ilga_url or 'ilga.gov' not in ilga_url:
+            return False
+        try:
+            resp = requests.get(ilga_url, timeout=15,
+                                headers={'User-Agent': 'govbot-urbanist/1.0'})
+            resp.raise_for_status()
+            text = resp.text
+            # ILGA uses these markers when witness slips are open
+            slip_markers = (
+                'WitnessSlip',
+                'witnessslip',
+                'Create Slip',
+                'createSlip',
+                'Witness Slip Form',
+            )
+            return any(m in text for m in slip_markers)
+        except Exception:
+            return False
+
+
+
+def fetch_sample_bills() -> str:
+    """Download sample IL bills via the GitHub Contents API.
+
+    Uses the GitHub API (which returns JSON with download_url fields) rather
+    than trying to scrape a raw directory listing — raw.githubusercontent.com
+    does not serve HTML indexes.
+    """
+    print("📥 Fetching sample IL bills via GitHub Contents API...")
+
+    temp_dir = Path(tempfile.gettempdir()) / "witness-slip-test-data"
+    temp_dir.mkdir(exist_ok=True)
+
+    # GitHub Contents API for the il-legislation data repo
+    api_url = (
+        "https://api.github.com/repos/govbot-openstates-scrapers/il-legislation/contents/"
+        "_data/il"
+    )
+    headers = {"Accept": "application/vnd.github+json"}
+    github_token = os.getenv("GITHUB_TOKEN", "")
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+
+    try:
+        resp = requests.get(api_url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        entries = resp.json()
+    except Exception as e:
+        print(f"⚠️  GitHub API request failed: {e}")
+        entries = []
+
+    downloaded = 0
+    for entry in entries[:10]:  # grab up to 10 sample bills
+        download_url = entry.get("download_url")
+        if not download_url:
+            continue
+        filename = entry.get("name", download_url.split("/")[-1])
+        try:
+            file_resp = requests.get(download_url, timeout=15)
+            if file_resp.status_code == 200:
+                (temp_dir / filename).write_text(file_resp.text)
+                print(f"  ✅ Downloaded {filename}")
+                downloaded += 1
+            else:
+                print(f"  ⚠️  Skipped {filename} (HTTP {file_resp.status_code})")
+        except Exception as e:
+            print(f"  ⚠️  Failed {filename}: {e}")
+
+    if downloaded == 0:
+        print("❌ No sample bills downloaded. Verify the repo name/path and try again.")
+        sys.exit(1)
+
+    print(f"✅ Using {downloaded} sample bill(s) from: {temp_dir}")
+    return str(temp_dir)
+
+
+class EnvironmentConfig:
+    """Load configuration from environment variables (GitHub Secrets)"""
+    
+    @staticmethod
+    def load():
+        return {
+            'user': {
+                'name': os.getenv('USER_NAME', 'Urbanist Advocate'),
+                'email': os.getenv('USER_EMAIL', '[email protected]'),
+                'organization': os.getenv('USER_ORG', 'Chicago Urbanists')
+            },
+            'subscriptions': {
+                'transportation': {
+                    'topics': [t.strip() for t in os.getenv('TOPICS_TRANSPORTATION',
+                        'Transportation,Public Transit,Roads,Highways,Traffic,Commuter Rail,Metra,CTA,RTA').split(',')],
+                    'recipients': [r.strip() for r in os.getenv('RECIPIENTS_TRANSPORTATION', '').split(',') if r.strip()]
+                },
+                'transit': {
+                    'topics': [t.strip() for t in os.getenv('TOPICS_TRANSIT',
+                        'Transit,Bus,Rail,Subway,Light Rail,Rapid Transit,Bus Rapid Transit,BRT,PACE,CTA,Metra,RTA').split(',')],
+                    'recipients': [r.strip() for r in os.getenv('RECIPIENTS_TRANSIT', '').split(',') if r.strip()]
+                },
+                'biking': {
+                    'topics': [t.strip() for t in os.getenv('TOPICS_BIKING',
+                        'Bicycle,Biking,Bike Lane,Cycling,Micromobility,E-Bike,Scooter,Active Transportation').split(',')],
+                    'recipients': [r.strip() for r in os.getenv('RECIPIENTS_BIKING', '').split(',') if r.strip()]
+                },
+                'safe_streets': {
+                    'topics': [t.strip() for t in os.getenv('TOPICS_SAFE_STREETS',
+                        'Pedestrian,Safe Streets,Vision Zero,Traffic Safety,Crosswalk,Speed Limit,Complete Streets,Sidewalk').split(',')],
+                    'recipients': [r.strip() for r in os.getenv('RECIPIENTS_SAFE_STREETS', '').split(',') if r.strip()]
+                },
+                'housing': {
+                    'topics': [t.strip() for t in os.getenv('TOPICS_HOUSING',
+                        'Housing,Affordable Housing,Real Estate,Zoning,Land Use,Development,TOD,Transit-Oriented,Upzoning,ADU').split(',')],
+                    'recipients': [r.strip() for r in os.getenv('RECIPIENTS_HOUSING', '').split(',') if r.strip()]
+                },
+                'all_recipients': [r.strip() for r in os.getenv('RECIPIENTS_ALL', '').split(',') if r.strip()],
+                'tracked_bills': [b.strip() for b in os.getenv('TRACKED_BILLS', '').split(',') if b.strip()]
+            },
+            'settings': {
+                'urgency_threshold_days': int(os.getenv('URGENCY_THRESHOLD_DAYS') or '7')
+            }
+        }
+
+def send_email(subject: str, plain_body: str, html_body: str, recipients: List[str]) -> None:
+    """Send email via SMTP (MailHog in local dev)."""
+    if not recipients:
+        return
+
+    host = os.getenv("SMTP_HOST", "localhost")
+    port = int(os.getenv("SMTP_PORT") or "1025")
+    username = os.getenv("SMTP_USER", "")
+    password = os.getenv("SMTP_PASSWORD", "")
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.getenv("USER_EMAIL", "[email protected]")
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(plain_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    with smtplib.SMTP(host, port) as server:
+        if username and password:
+            server.starttls()
+            server.login(username, password)
+        server.send_message(msg)
+
+    print(f"📧 Sent email to: {msg['To']}")
+
+
+class NotificationGenerator:
+    """Generate email notifications"""
+    
+    def __init__(self, config: dict):
+        self.config = config
+        self.user = config['user']
+    
+    def generate_notifications(self, bills: List[Bill]) -> tuple:
+        """Generate plain text and HTML emails"""
+        
+        # Route bills to subscriptions
+        routed = self._route_bills(bills)
+        
+        if not routed:
+            return ("No bills matched subscriptions.\n", "<p>No bills matched.</p>")
+        
+        plain = self._generate_plain(routed)
+        html = self._generate_html(routed)
+        
+        return plain, html
+    
+    # Maps subscription key → (emoji label, env-var suffix)
+    SUBSCRIPTION_CATEGORIES = [
+        ('tracked_bills',  None,           None),          # handled separately
+        ('transportation', '🚗 Transportation', 'TRANSPORTATION'),
+        ('transit',        '🚇 Transit',        'TRANSIT'),
+        ('biking',         '🚲 Biking',          'BIKING'),
+        ('safe_streets',   '🚶 Safe Streets',    'SAFE_STREETS'),
+        ('housing',        '🏘️ Housing & Development', 'HOUSING'),
+    ]
+
+    def _route_bills(self, bills: List[Bill]) -> Dict:
+        """Route bills into urbanist topic buckets.
+
+        A bill can appear in multiple categories (a transit-oriented housing
+        bill belongs in both Transit and Housing).  Tracked bills are always
+        listed first regardless of topic.
+        """
+        subs = self.config['subscriptions']
+        routed = {}
+
+        # Specific bill tracking (pinned at the top)
+        for bill in bills:
+            if bill.bill_number in subs['tracked_bills']:
+                routed.setdefault('🎯 Tracked Bills', []).append(bill)
+
+        # Topic categories — a bill may appear in more than one
+        for key, label, _ in self.SUBSCRIPTION_CATEGORIES:
+            if label is None:
+                continue
+            sub = subs.get(key, {})
+            if not sub.get('recipients') and not subs.get('all_recipients'):
+                continue
+            matched = [b for b in bills if b.matches_topics(sub.get('topics', []))]
+            if matched:
+                routed[label] = matched
+
+        return routed
+    
+    def _generate_plain(self, routed: Dict) -> str:
+        total = sum(len(bills) for bills in routed.values())
+        
+        text = f"""🔔 URGENT: Illinois Witness Slip Action Needed
+
+{total} bill(s) require witness slip submissions for urbanist priorities.
+
+{'='*70}
+
+"""
+        
+        for category, bills in routed.items():
+            text += f"\n{category}\n{'='*70}\n"
+            text += f"{len(bills)} bill(s)\n\n"
+            
+            for i, bill in enumerate(bills, 1):
+                urgency = ""
+                if bill.committee_hearing_date:
+                    days = (bill.committee_hearing_date - datetime.now()).days
+                    if days <= self.config['settings']['urgency_threshold_days']:
+                        urgency = f" ⚠️ URGENT ({days} days)"
+                
+                topics_str = f"\n  🏷️  Topics: {', '.join(bill.subjects)}" if bill.subjects else ""
+                hearing_str = ""
+                if bill.committee_hearing_date:
+                    hearing_str = f"\n  📅 Hearing: {bill.committee_hearing_date.strftime('%B %d, %Y at %I:%M %p')}"
+                    if bill.committee_name:
+                        hearing_str += f"\n  🏛️  Committee: {bill.committee_name}"
+                
+                text += f"""{i}. {bill.bill_number} - {bill.title}{urgency}
+{'-'*70}
+  👤 Sponsor: {bill.sponsor}
+  🏛️  Chamber: {bill.chamber.value}
+  📖 Next Reading: {bill.next_reading.value}{topics_str}{hearing_str}
+  
+  📋 File Witness Slip: {bill.get_witness_slip_url()}
+  📊 Bill Status: {bill.ilga_url}
+
+"""
+        
+        text += f"""
+{'='*70}
+📝 HOW TO FILE
+{'='*70}
+
+1. Click witness slip link above
+2. Find scheduled hearing
+3. Click "Create Witness Slip"
+4. Fill in:
+   • Name: {self.user['name']}
+   • Organization: {self.user['organization']}
+   • Position: Select stance
+   • Testimony: "Record of Appearance Only"
+5. Submit
+
+⏰ File BEFORE hearing concludes!
+
+---
+Govbot Urbanist Notification System
+Generated: {datetime.now().strftime('%Y-%m-%d %I:%M %p CST')}
+"""
+        return text
+    
+    def _generate_html(self, routed: Dict) -> str:
+        total = sum(len(bills) for bills in routed.values())
+        
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background: #f9fafb; }}
+.header {{ background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; }}
+.category {{ background: white; border-radius: 12px; padding: 24px; margin-bottom: 30px; border-left: 5px solid #0891b2; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+.category-header {{ background: #ecfeff; padding: 15px; border-radius: 8px; margin: -24px -24px 20px -24px; }}
+.bill-card {{ border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 20px; background: #fafafa; }}
+.bill-header {{ background: #0891b2; color: white; padding: 12px 20px; border-radius: 8px; margin: -20px -20px 15px -20px; }}
+.topic-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; margin: 2px; font-weight: 600; }}
+.urgent {{ background: #ef4444; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75em; margin-left: 10px; }}
+.action-btn {{ display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 5px 5px 5px 0; font-weight: bold; }}
+.stats {{ background: #ecfeff; border: 2px solid #0891b2; border-radius: 8px; padding: 15px; margin-bottom: 30px; text-align: center; }}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>🚇🏘️ IL Urbanist Witness Slip Action</h1>
+<p>Transportation & Housing Priorities</p>
+</div>
+
+<div class="stats">
+<strong style="font-size: 2em; color: #0891b2;">{total}</strong>
+<p style="margin: 5px 0 0 0; color: #6b7280;">Bills Requiring Action</p>
+</div>
+"""
+        
+        for category, bills in routed.items():
+            html += f"""
+<div class="category">
+<div class="category-header">
+<h2 style="margin: 0; color: #0891b2;">{category}</h2>
+<p style="margin: 5px 0 0 0; color: #6b7280;">{len(bills)} bill(s)</p>
+</div>
+"""
+            
+            for bill in bills:
+                urgency_badge = ""
+                if bill.committee_hearing_date:
+                    days = (bill.committee_hearing_date - datetime.now()).days
+                    if days <= self.config['settings']['urgency_threshold_days']:
+                        urgency_badge = f'<span class="urgent">⚠️ {days} days</span>'
+                
+                topics_html = ""
+                if bill.subjects:
+                    topics_html = '<div style="margin: 10px 0;">'
+                    for topic in bill.subjects:
+                        topics_html += f'<span class="topic-badge">🏷️ {topic}</span>'
+                    topics_html += '</div>'
+                
+                html += f"""
+<div class="bill-card">
+<div class="bill-header">
+<strong>{bill.bill_number}</strong> - {bill.title} {urgency_badge}
+</div>
+<p><strong>👤 Sponsor:</strong> {bill.sponsor}</p>
+<p><strong>🏛️ Chamber:</strong> {bill.chamber.value}</p>
+<p><strong>📖 Next Reading:</strong> {bill.next_reading.value}</p>
+"""
+                
+                if bill.committee_hearing_date:
+                    html += f'<p><strong>📅 Hearing:</strong> {bill.committee_hearing_date.strftime("%A, %B %d, %Y at %I:%M %p")}</p>'
+                    if bill.committee_name:
+                        html += f'<p><strong>🏛️ Committee:</strong> {bill.committee_name}</p>'
+                
+                html += topics_html
+                html += f"""
+<div style="margin-top: 15px;">
+<a href="{bill.get_witness_slip_url()}" class="action-btn">📋 File Witness Slip</a>
+<a href="{bill.ilga_url}" class="action-btn" style="background: #6366f1;">📊 Bill Status</a>
+</div>
+</div>
+"""
+            
+            html += "</div>"
+        
+        html += f"""
+<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 30px 0; border-radius: 8px;">
+<h3 style="margin-top: 0;">📝 How to File</h3>
+<ol>
+<li>Click "File Witness Slip" button</li>
+<li>Navigate to committee hearing</li>
+<li>Click "Create Witness Slip"</li>
+<li>Fill in: Name ({self.user['name']}), Organization ({self.user['organization']}), Position, Testimony</li>
+<li>Submit</li>
+</ol>
+</div>
+
+<div style="text-align: center; color: #6b7280; font-size: 0.9em; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+<p><strong>Govbot Urbanist Notification System</strong></p>
+<p>Transportation & Housing • Data: govbot-openstates-scrapers/il-legislation</p>
+<p>Generated: {datetime.now().strftime('%Y-%m-%d %I:%M %p CST')}</p>
+</div>
+</body>
+</html>
+"""
+        return html
+    
+    def generate_json(self, bills: List[Bill]) -> List[Dict]:
+        """Generate JSON output for artifacts"""
+        routed = self._route_bills(bills)
+        
+        output = []
+        for category, bills in routed.items():
+            for bill in bills:
+                output.append({
+                    'category': category,
+                    'bill_number': bill.bill_number,
+                    'title': bill.title,
+                    'topics': bill.subjects,
+                    'chamber': bill.chamber.value,
+                    'sponsor': bill.sponsor,
+                    'next_reading': bill.next_reading.value,
+                    'witness_slip_url': bill.get_witness_slip_url(),
+                    'bill_status_url': bill.ilga_url,
+                    'committee_hearing': bill.committee_hearing_date.isoformat() if bill.committee_hearing_date else None,
+                    'committee_name': bill.committee_name
+                })
+        
+        return output
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="IL Urbanist Witness Slip Notifier"
+    )
+    parser.add_argument('--mode', choices=['github-action', 'local'], default='local')
+    # --- Input source (pick one) ---
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--feed',
+        metavar='PATH',
+        help='Path to the RSS feed produced by `govbot build` (preferred)'
+    )
+    group.add_argument(
+        '--data-dir',
+        metavar='PATH',
+        default='data/il',
+        help='Legacy: parse raw OpenStates JSON files directly'
+    )
+    group.add_argument(
+        '--sample',
+        action='store_true',
+        help='Download a small sample from GitHub for local smoke-testing'
+    )
+    args = parser.parse_args()
+
+    print("\n" + "="*70)
+    print("🚲🚇🏘️ IL URBANIST WITNESS SLIP NOTIFIER")
+    print("="*70 + "\n")
+
+    # Load config from environment
+    config = EnvironmentConfig.load()
+    print(f"👤 User: {config['user']['name']}")
+    print(f"🏢 Organization: {config['user']['organization']}\n")
+
+    # --- Parse bills from the chosen source ---
+    if args.feed:
+        # PRIMARY PATH: govbot RSS feed (clone → tag → RSS already done)
+        print("📡 Input mode: govbot RSS feed")
+        bills = GovbotFeedParser.parse_feed(args.feed)
+    elif args.sample:
+        # TESTING PATH: pull a handful of bills from GitHub
+        print("🧪 Input mode: sample download")
+        sample_dir = fetch_sample_bills()
+        bills = OpenStatesParser.parse_data_directory(sample_dir)
+    else:
+        # LEGACY PATH: raw OpenStates JSON directory
+        print(f"📂 Input mode: raw data directory ({args.data_dir})")
+        bills = OpenStatesParser.parse_data_directory(args.data_dir)
+    
+
+    # ── Merge STC tracked bills first (before any early-exit) ─────────────────────
+    # This ensures tracked bills always appear in the digest even when the
+    # govbot feed is stale, empty, or contains only amendment/appointment items.
+    import re as _re
+    feed_ids = {b.bill_number for b in bills}
+    stc_added = 0
+    for bill_num, (category, stc_desc, stance) in STC_TRACKED_BILLS.items():
+        norm = _re.sub(r'\s+', '', bill_num.upper())
+        if norm not in feed_ids:
+            _chamber = Chamber.HOUSE if norm.startswith('H') else Chamber.SENATE
+            _num     = _re.sub(r'[^\d]', '', norm)
+            _dt      = 'HB' if _chamber == Chamber.HOUSE else 'SB'
+            stub = Bill(
+                bill_number=norm, chamber=_chamber,
+                title=stc_desc, sponsor='Unknown',
+                next_reading=BillReading.FIRST,
+                subjects=[category],
+                ilga_url=(
+                    f"https://www.ilga.gov/legislation/BillStatus.asp"
+                    f"?DocTypeID={_dt}&DocNum={_num}&GAID=18&SessionID=114"
+                ),
+            )
+            stub.stance = stance
+            bills.append(stub)
+            feed_ids.add(norm)
+            stc_added += 1
+
+    # Tag stance on all bills (feed bills that match STC list get their stance too)
+    for b in bills:
+        if not hasattr(b, 'stance'):
+            info = STC_TRACKED_BILLS.get(b.bill_number)
+            b.stance = info[2] if info else 'Proponent'
+
+    feed_bills = len(bills) - stc_added
+    print(f"📊 Feed bills parsed: {feed_bills} | STC stubs added: {stc_added} | Total: {len(bills)}")
+
+    if not bills:
+        msg = "No bills found and no tracked bills configured."
+        print(f"⚠️  {msg}")
+        if args.mode == 'github-action':
+            Path('notifications_output.txt').write_text(msg + '\n')
+            Path('notifications_output.html').write_text(f'<p>{msg}</p>')
+            Path('witness_slip_notifications.json').write_text('[]')
+        sys.exit(0)
+
+    # ── Build actionable list ─────────────────────────────────────────────────────────
+    # In feed mode: include all bills with at least one tag (STC stubs always
+    # have a tag so they're always included). In data-dir mode: use date window.
+    # Only include bills that matched an urbanist topic (have a subjects tag).
+    # STC stubs always have a subject set, so they're always included.
+    # In --data-dir mode, next_reading defaults to FIRST for every bill (no
+    # reliable hearing-date data in metadata.json), so we cannot use a date
+    # window — topic matching is the only meaningful filter.
+    URBANIST_TOPICS = {'Housing', 'Biking', 'Safe Streets', 'Transit', 'Transportation'}
+    now = datetime.now()
+
+    if args.feed:
+        actionable = [b for b in bills if b.subjects]
+        # ── Always cross-reference ILGA hearing calendar, even in feed/stub mode ──
+        # Without this, STC stubs never get hearing dates because the calendar
+        # scrape only ran inside the --data-dir branch below.
+        print('📅 Fetching ILGA committee hearing calendar...')
+        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        if bill_hearings:
+            print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
+            matched = []
+            for b in actionable:
+                norm = re.sub(r'\s+', '', b.bill_number.upper())
+                if norm in bill_hearings:
+                    b.committee_hearing_date = bill_hearings[norm]
+                    matched.append(b)
+                    print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
+            if matched:
+                print(f'   ✅ {len(matched)} tracked bills have hearings on the calendar')
+            else:
+                print('   ℹ️  No tracked bills on the hearing schedule right now')
+        else:
+            print('   ⚠️  Could not fetch hearing calendar')
+    else:
+        # Step 1: topic match
+        topic_matched = [b for b in bills
+                         if b.subjects and set(b.subjects) & URBANIST_TOPICS]
+
+        # Step 2: committee referral filter
+        # Bills whose most recent meaningful action is a committee assignment
+        # are the most likely to have an imminent hearing.
+        in_committee = [b for b in topic_matched if b.committee_name]
+        not_in_committee = [b for b in topic_matched if not b.committee_name]
+
+        if in_committee:
+            print(f'🏛️  {len(in_committee)} bills currently in committee '
+                  f'(+ {len(not_in_committee)} not yet assigned)')
+
+        # Step 3: cross-reference ILGA hearing calendar
+        print('📅 Fetching ILGA committee hearing calendar...')
+        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        if bill_hearings:
+            print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
+            hearing_soon = []
+            for b in topic_matched:
+                norm = re.sub(r'\s+', '', b.bill_number.upper())
+                if norm in bill_hearings:
+                    b.committee_hearing_date = bill_hearings[norm]
+                    hearing_soon.append(b)
+                    print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
+            if hearing_soon:
+                print(f'   ✅ {len(hearing_soon)} tracked bills have hearings on the calendar')
+            else:
+                print('   ℹ️  No tracked bills on the hearing schedule right now')
+        else:
+            print('   ⚠️  Could not fetch hearing calendar — showing all topic-matched bills')
+            hearing_soon = []
+
+
+        # Step 4: optionally verify witness slip is actually open on ILGA
+        check_slips = os.environ.get('CHECK_SLIP_LIVE', '').lower() in ('1', 'true', 'yes')
+        if check_slips and hearing_soon:
+            print(f'🔍 Checking live slip status for {len(hearing_soon)} bills...')
+            slip_open = []
+            for b in hearing_soon:
+                if OpenStatesParser.check_slip_open(b.ilga_url):
+                    slip_open.append(b)
+                    print(f'   ✅ Slip open: {b.bill_number}')
+                else:
+                    print(f'   ⏳ No active slip yet: {b.bill_number}')
+            actionable = slip_open if slip_open else hearing_soon
+        else:
+            # Without live check: bills with hearings on calendar, then all in-committee, then all matched
+            actionable = hearing_soon if hearing_soon else (in_committee if in_committee else topic_matched)
+
+
+    # ── Group by category for display ───────────────────────────────────────────────
+    from collections import defaultdict
+    by_category = defaultdict(list)
+    for b in actionable:
+        cat = b.subjects[0] if b.subjects else 'Other'
+        by_category[cat].append(b)
+
+    CAT_ORDER = ['Housing', 'Biking', 'Safe Streets', 'Transit', 'Transportation', 'Other']
+    STANCE_EMOJI = {'Proponent': '👍', 'Opponent': '🚫'}
+
+    lines_txt  = []
+    lines_html = [
+        '<html><body style="font-family:sans-serif;max-width:680px;margin:auto;color:#222">',
+        '<h2>🚲🚇🏘️ IL Urbanist Bills — Witness Slip Digest</h2>',
+    ]
+
+    # Split bills: hearing scheduled vs. watchlist
+    with_hearing    = [b for b in actionable if b.committee_hearing_date]
+    without_hearing = [b for b in actionable if not b.committee_hearing_date]
+
+    if with_hearing:
+        lines_html.append('<p style="background:#e6f4ea;padding:10px;border-radius:6px">'
+                          '🔔 <strong>Action needed:</strong> the bills below have '
+                          'committee hearings scheduled. File your witness slip now!</p>')
+    else:
+        lines_html.append('<p><em>No hearings scheduled this week. '
+                          'Bills on the watchlist are shown below.</em></p>')
+
+    def render_bill(b, lines_t, lines_h):
+        slip_url = b.get_witness_slip_url()
+        stance   = getattr(b, 'stance', 'Proponent')
+        emoji    = '👍' if stance == 'Proponent' else '🚫'
+        hearing  = (b.committee_hearing_date.strftime('🗓 Hearing: %b %-d, %Y %I:%M %p')
+                    if b.committee_hearing_date else '')
+        cmt      = f' ({b.committee_name})' if b.committee_name else ''
+        lines_t.append(
+            f'  {emoji} {b.bill_number}: {b.title[:70]}\n'
+            f'     Stance: {stance}{(" | " + hearing) if hearing else ""}\n'
+            f'     Witness slip: {slip_url}'
+        )
+        lines_h.append(
+            f'<li style="margin-bottom:10px">'
+            f'<strong>{b.bill_number}</strong> ({stance}) — {b.title[:80]}'
+            f'{"<br><small>" + hearing + cmt + "</small>" if hearing else ""}'
+            f'<br><a href="{slip_url}">📝 File Witness Slip</a></li>'
+        )
+
+    total = 0
+    by_category = defaultdict(list)
+    for b in actionable:
+        cat = b.subjects[0] if b.subjects else 'Other'
+        by_category[cat].append(b)
+
+    # ── Bills WITH hearings — prominent ──────────────────────────────────
+    if with_hearing:
+        lines_txt.append('\n📅 BILLS WITH SCHEDULED HEARINGS')
+        lines_txt.append('=' * 50)
+        for cat in CAT_ORDER:
+            cat_bills = [b for b in with_hearing
+                         if (b.subjects[0] if b.subjects else 'Other') == cat]
+            if not cat_bills:
+                continue
+            lines_txt.append(f'\n{cat} ({len(cat_bills)} bills)')
+            lines_html.append(f'<h3>{cat}</h3><ul>')
+            for b in sorted(cat_bills, key=lambda x: x.bill_number):
+                render_bill(b, lines_txt, lines_html)
+                total += 1
+            lines_html.append('</ul>')
+
+    # ── Bills WITHOUT hearings — collapsible ─────────────────────────────
+    if without_hearing:
+        lines_txt.append(f'\n\n👀 WATCHLIST — NO HEARING SCHEDULED ({len(without_hearing)} bills)')
+        lines_txt.append('(These bills are being tracked but have no committee hearing yet)')
+        lines_txt.append('=' * 50)
+        lines_html.append(
+            f'<details style="margin-top:20px"><summary style="cursor:pointer;'
+            f'font-weight:bold;font-size:1.05em">👀 Watchlist — no hearing scheduled '
+            f'({len(without_hearing)} bills) — click to expand</summary>'
+        )
+        for cat in CAT_ORDER:
+            cat_bills = [b for b in without_hearing
+                         if (b.subjects[0] if b.subjects else 'Other') == cat]
+            if not cat_bills:
+                continue
+            lines_txt.append(f'\n{cat} ({len(cat_bills)} bills)')
+            lines_html.append(f'<h4 style="margin-top:14px">{cat}</h4><ul>')
+            for b in sorted(cat_bills, key=lambda x: x.bill_number):
+                render_bill(b, lines_txt, lines_html)
+                total += 1
+            lines_html.append('</ul>')
+        lines_html.append('</details>')
+
+    lines_html.append('</body></html>')
+
+    plain = '\n'.join(lines_txt)
+    html  = '\n'.join(lines_html)
+
+    print(f"\u2705 Digest ready: {total} bills across {len(by_category)} categories")
+    for cat, cat_bills in sorted(by_category.items()):
+        print(f"   {cat}: {len(cat_bills)} bills")
+
+    # ── Write output files ─────────────────────────────────────────────────────────────
+    json_output = [
+        {'bill_number': b.bill_number,
+         'chamber': b.chamber.value,
+         'title': b.title,
+         'category': b.subjects[0] if b.subjects else 'Other',
+         'stance': getattr(b, 'stance', 'Proponent'),
+         'witness_slip_url': b.get_witness_slip_url(),
+         'committee_hearing_date': (
+             b.committee_hearing_date.isoformat()
+             if b.committee_hearing_date else None),
+         'committee_name': b.committee_name,
+         'source': 'stc_tracked' if b.bill_number in {re.sub(r'\s+','',k.upper()) for k in STC_TRACKED_BILLS} else 'feed',
+        }
+        for b in actionable
+    ]
+
+    if args.mode == 'github-action':
+        Path('notifications_output.txt').write_text(plain)
+        Path('notifications_output.html').write_text(html)
+        Path('witness_slip_notifications.json').write_text(
+            json.dumps(json_output, indent=2, ensure_ascii=False)
+        )
+        print("✅ Output files written")
+    else:
+        print(plain)
+
+
+if __name__ == "__main__":
+    main()

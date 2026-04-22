@@ -15,17 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch IL OpenStates data
-        run: |
-          # Clone the govbot-openstates-scrapers IL data so the notifier
-          # can cross-reference live bill metadata (subjects, committee, etc.)
-          git clone --depth=1 \
-            https://github.com/govbot-openstates-scrapers/il-legislation.git \
-            _il_legislation
-          mkdir -p data
-          # The scraper stores bills under _data/il/
-          ln -s "$(pwd)/_il_legislation/_data/il" data/il
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -46,18 +35,12 @@ jobs:
           import json, datetime, pathlib
 
           # ── Load bill output written by the notifier ───────────────────
-          # Prefer the notifier handoff file, but fall back to a mirrored
-          # stable path if the primary filename ever changes.
-          src_candidates = [
-              pathlib.Path('witness_slip_notifications.json'),
-              pathlib.Path('docs/data/bills.source.json'),
-          ]
-          src = next((p for p in src_candidates if p.exists()), None)
-          bills = json.loads(src.read_text()) if src else []
-          if src:
-              print(f'Loaded {len(bills)} bills from notifier output ({src})')
-          else:
-              print('Loaded 0 bills from notifier output (no source file found)')
+          # witness_slip_notifier.py already merges STC_TRACKED_BILLS into
+          # witness_slip_notifications.json, so we do not fetch or parse a
+          # remote notifier source here.
+          src = pathlib.Path('witness_slip_notifications.json')
+          bills = json.loads(src.read_text()) if src.exists() else []
+          print(f'Loaded {len(bills)} bills from notifier output')
 
           # ── Illinois legislative session status ────────────────────────
           # 104th GA: spring session Jan–May, veto session ~Nov 10–20.
@@ -122,4 +105,5 @@ jobs:
           git add -f docs/data/bills.json
           git diff --staged --quiet && exit 0
           git commit -m "chore: update bills.json [skip ci]"
-          git push --force-with-lease origin HEAD:main
+          git pull --rebase origin main
+          git push origin HEAD:main
