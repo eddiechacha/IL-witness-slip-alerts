@@ -681,5 +681,18 @@ class OpenStatesParser:
 
         print(f'   Parsed {len(bill_hearings)} unique bills from hearing calendar')
         return bill_hearings
+    
+    def write_notifier_output_files(bills_payload) -> None:
+        """Write stable JSON handoff files for GitHub Actions."""
+    payload = bills_payload or []
+    Path('docs/data').mkdir(parents=True, exist_ok=True)
+    Path('witness_slip_notifications.json').write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False)
+    )
+    Path('docs/data/bills.source.json').write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False)
+    )
+    print(f"✅ Wrote witness_slip_notifications.json ({len(payload)} bills)")
+    print(f"✅ Wrote docs/data/bills.source.json ({len(payload)} bills)")
 
     # Optionally verify witness slip is open on ILGA
