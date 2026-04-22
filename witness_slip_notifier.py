@@ -503,7 +503,10 @@ class OpenStatesParser:
                 first_text(data, 'ilga_url') or
                 first_text(data, 'openstates_url') or
                 first_text(data, 'url') or
-                f"https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID={'HB' if chamber == Chamber.HOUSE else 'SB'}&DocNum={re.sub(r'[^\d]', '', bill_number)}&GAID=18&SessionID=114"
+                "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=" +
+                ('HB' if chamber == Chamber.HOUSE else 'SB') +
+                "&DocNum=" + re.sub(r'[^\d]', '', bill_number) +
+                "&GAID=18&SessionID=114"
             )
 
             return Bill(
