@@ -482,12 +482,12 @@ class OpenStatesParser:
         Returns a dict of {bill_number_upper: datetime} mapping each bill that
         has a scheduled committee hearing to its next hearing date/time.
 
-        ILGA publishes two clean tables at:
-          https://ilga.gov/House/Schedules/Legislation
-          https://ilga.gov/Senate/Schedules/Legislation
-
-        Each row contains the bill number, committee name, date, and time —
-        scraped directly so no fuzzy committee-name matching is needed.
+        Strategy:
+          1. Fetch the House and Senate schedule listing pages.
+          2. Extract hearing detail URLs and their associated date/time.
+          3. For each detail page, scan the FULL HTML — this captures bill
+             numbers listed under "Subject Matter" as well as "Bills Assigned
+             To Hearing". ILGA often only lists bills under Subject Matter.
         """
         import re
         bill_hearings = {}  # bill_number -> datetime
@@ -495,48 +495,90 @@ class OpenStatesParser:
         # Matches e.g. "04/07/2026" or "4/7/2026" with optional time "2:00PM"
         date_re = re.compile(
             r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?', re.I)
-        # Matches bill identifiers like HB1234, SB567, HR12, SR3
-        bill_re = re.compile(r'\b([HS][BCR]\d+)\b', re.I)
+        # Matches bill identifiers like HB1234 SB567 HR12 SR3 (with optional space)
+        bill_re = re.compile(r'\b([HS][BCR]\s*\d+)\b', re.I)
+        # Hearing detail links e.g. /Senate/hearings/details/3072/22865
+        detail_re = re.compile(
+            r'href=["\']([^"\']*/hearings/details/[^"\']*)["\'\s>]', re.I)
+
+        headers = {'User-Agent': 'govbot-urbanist/1.0'}
 
         for chamber in ('House', 'Senate'):
             url = f'https://ilga.gov/{chamber}/Schedules/Legislation'
             try:
-                resp = requests.get(url, timeout=20,
-                                    headers={'User-Agent': 'govbot-urbanist/1.0'})
+                resp = requests.get(url, timeout=20, headers=headers)
                 resp.raise_for_status()
             except Exception as e:
                 print(f'   ⚠️  Could not fetch {url}: {e}')
                 continue
 
-            # The page is an HTML table. Walk every line looking for bill IDs
-            # adjacent to a date. ILGA's table has bill number and date in the
-            # same <tr>, so we accumulate context within a small window.
-            lines = resp.text.splitlines()
+            schedule_text = resp.text
+
+            # ── Pass 1: extract bill IDs directly from the schedule listing ──
+            # Some bills appear inline on the schedule page with a date nearby.
+            lines = schedule_text.splitlines()
             for i, line in enumerate(lines):
                 bm = bill_re.search(line)
                 if not bm:
                     continue
-                bill_id = bm.group(1).upper()
-                # Look for a date in the same line or the next 5 lines
+                bill_id = re.sub(r'\s+', '', bm.group(1).upper())
                 window = ' '.join(lines[i:i+6])
                 dm = date_re.search(window)
                 if not dm:
                     continue
                 date_str = dm.group(1)
-                time_str = dm.group(2) or '12:00 PM'
+                time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
                 try:
-                    dt = datetime.strptime(
-                        f'{date_str} {time_str.replace(" ", "")}',
-                        '%m/%d/%Y %I:%M%p'
-                    )
+                    dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
                 except ValueError:
                     try:
                         dt = datetime.strptime(date_str, '%m/%d/%Y')
                     except ValueError:
                         continue
-                # Keep earliest upcoming hearing per bill
                 if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
                     bill_hearings[bill_id] = dt
+
+            # ── Pass 2: follow each hearing detail link and scan full HTML ──
+            # ILGA lists bills under "Subject Matter" on the detail page,
+            # not in the bills table — so we must fetch every detail page.
+            detail_urls = detail_re.findall(schedule_text)
+            seen_detail_urls = set()
+            for detail_path in detail_urls:
+                detail_url = (
+                    detail_path if detail_path.startswith('http')
+                    else f'https://ilga.gov{detail_path}'
+                )
+                if detail_url in seen_detail_urls:
+                    continue
+                seen_detail_urls.add(detail_url)
+                try:
+                    dresp = requests.get(detail_url, timeout=20, headers=headers)
+                    dresp.raise_for_status()
+                except Exception:
+                    continue
+
+                detail_text = dresp.text
+
+                # Extract the hearing date/time from this detail page
+                dm = date_re.search(detail_text)
+                if not dm:
+                    continue
+                date_str = dm.group(1)
+                time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
+                try:
+                    dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
+                except ValueError:
+                    try:
+                        dt = datetime.strptime(date_str, '%m/%d/%Y')
+                    except ValueError:
+                        continue
+
+                # Scan the FULL page HTML for bill numbers —
+                # this catches Subject Matter AND Bills Assigned To Hearing.
+                for bm in bill_re.finditer(detail_text):
+                    bill_id = re.sub(r'\s+', '', bm.group(1).upper())
+                    if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
+                        bill_hearings[bill_id] = dt
 
         return bill_hearings
 
