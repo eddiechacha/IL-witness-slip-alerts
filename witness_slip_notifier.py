@@ -482,8 +482,8 @@ class OpenStatesParser:
         has a scheduled committee hearing to its next hearing date/time.
 
         ILGA publishes two clean tables at:
-          https://ilga.gov/House/Schedules/Legislation
-          https://ilga.gov/Senate/Schedules/Legislation
+        https://ilga.gov/House/Schedules/Legislation
+        https://ilga.gov/Senate/Schedules/Legislation
 
         Each row contains the bill number, committee name, date, and time —
         scraped directly so no fuzzy committee-name matching is needed.
@@ -491,11 +491,9 @@ class OpenStatesParser:
         import re
         bill_hearings = {}  # bill_number -> datetime
 
-        # Matches e.g. "04/07/2026" or "4/7/2026" with optional time "2:00PM"
         date_re = re.compile(
             r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?', re.I)
-        # Matches bill identifiers like HB1234, SB567, HR12, SR3
-        bill_re = re.compile(r'\b([HS][BCR]\d+)\b', re.I)
+        bill_re = re.compile(r'\b([HS][BCR]\s*-?\s*\d{1,5})\b', re.I)
 
         for chamber in ('House', 'Senate'):
             url = f'https://ilga.gov/{chamber}/Schedules/Legislation'
@@ -507,16 +505,13 @@ class OpenStatesParser:
                 print(f'   ⚠️  Could not fetch {url}: {e}')
                 continue
 
-            # The page is an HTML table. Walk every line looking for bill IDs
-            # adjacent to a date. ILGA's table has bill number and date in the
-            # same <tr>, so we accumulate context within a small window.
             lines = resp.text.splitlines()
             for i, line in enumerate(lines):
                 bm = bill_re.search(line)
                 if not bm:
                     continue
-                bill_id = bm.group(1).upper()
-                # Look for a date in the same line or the next 5 lines
+                bill_id = re.sub(r'\s+|-', '', bm.group(1).upper())
+
                 window = ' '.join(lines[i:i+6])
                 dm = date_re.search(window)
                 if not dm:
@@ -533,7 +528,7 @@ class OpenStatesParser:
                         dt = datetime.strptime(date_str, '%m/%d/%Y')
                     except ValueError:
                         continue
-                # Keep earliest upcoming hearing per bill
+
                 if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
                     bill_hearings[bill_id] = dt
 
