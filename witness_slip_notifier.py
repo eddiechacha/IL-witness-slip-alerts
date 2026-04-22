@@ -1051,65 +1051,37 @@ def main():
 
     if args.feed:
         actionable = [b for b in bills if b.subjects]
-        # ── Always cross-reference ILGA hearing calendar, even in feed/stub mode ──
-        # Without this, STC stubs never get hearing dates because the calendar
-        # scrape only ran inside the --data-dir branch below.
-        print('📅 Fetching ILGA committee hearing calendar...')
-        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
-        if bill_hearings:
-            print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
-            matched = []
-            for b in actionable:
-                norm = re.sub(r'\s+', '', b.bill_number.upper())
-                if norm in bill_hearings:
-                    b.committee_hearing_date = bill_hearings[norm]
-                    matched.append(b)
-                    print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
-            if matched:
-                print(f'   ✅ {len(matched)} tracked bills have hearings on the calendar')
-            else:
-                print('   ℹ️  No tracked bills on the hearing schedule right now')
-        else:
-            print('   ⚠️  Could not fetch hearing calendar')
     else:
-        # Step 1: topic match
-        topic_matched = [b for b in bills
-                         if b.subjects and set(b.subjects) & URBANIST_TOPICS]
+        # Legacy --data-dir mode: topic match only (no reliable hearing dates in metadata)
+        actionable = [b for b in bills
+                      if b.subjects and set(b.subjects) & URBANIST_TOPICS]
 
-        # Step 2: committee referral filter
-        # Bills whose most recent meaningful action is a committee assignment
-        # are the most likely to have an imminent hearing.
-        in_committee = [b for b in topic_matched if b.committee_name]
-        not_in_committee = [b for b in topic_matched if not b.committee_name]
-
-        if in_committee:
-            print(f'🏛️  {len(in_committee)} bills currently in committee '
-                  f'(+ {len(not_in_committee)} not yet assigned)')
-
-        # Step 3: cross-reference ILGA hearing calendar
-        print('📅 Fetching ILGA committee hearing calendar...')
-        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
-        if bill_hearings:
-            print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
-            hearing_soon = []
-            for b in topic_matched:
-                norm = re.sub(r'\s+', '', b.bill_number.upper())
-                if norm in bill_hearings:
-                    b.committee_hearing_date = bill_hearings[norm]
-                    hearing_soon.append(b)
-                    print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
-            if hearing_soon:
-                print(f'   ✅ {len(hearing_soon)} tracked bills have hearings on the calendar')
-            else:
-                print('   ℹ️  No tracked bills on the hearing schedule right now')
+    # ── Cross-reference ILGA hearing calendar (ALL modes) ─────────────────────────
+    # Runs after actionable is built so STC stubs, feed bills, and data-dir bills
+    # all get hearing dates stamped from the live ILGA calendar.
+    print('📅 Fetching ILGA committee hearing calendar...')
+    bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+    if bill_hearings:
+        print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
+        matched_hearings = []
+        for b in actionable:
+            norm = re.sub(r'\s+', '', b.bill_number.upper())
+            if norm in bill_hearings:
+                b.committee_hearing_date = bill_hearings[norm]
+                matched_hearings.append(b)
+                print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
+        if matched_hearings:
+            print(f'   ✅ {len(matched_hearings)} tracked bills have hearings on the calendar')
         else:
-            print('   ⚠️  Could not fetch hearing calendar — showing all topic-matched bills')
-            hearing_soon = []
+            print('   ℹ️  No tracked bills on the hearing schedule right now')
+    else:
+        print('   ⚠️  Could not fetch hearing calendar')
 
-
-        # Step 4: optionally verify witness slip is actually open on ILGA
-        check_slips = os.environ.get('CHECK_SLIP_LIVE', '').lower() in ('1', 'true', 'yes')
-        if check_slips and hearing_soon:
+    # Optionally verify witness slip is open on ILGA
+    check_slips = os.environ.get('CHECK_SLIP_LIVE', '').lower() in ('1', 'true', 'yes')
+    if check_slips:
+        hearing_soon = [b for b in actionable if b.committee_hearing_date]
+        if hearing_soon:
             print(f'🔍 Checking live slip status for {len(hearing_soon)} bills...')
             slip_open = []
             for b in hearing_soon:
@@ -1118,10 +1090,8 @@ def main():
                     print(f'   ✅ Slip open: {b.bill_number}')
                 else:
                     print(f'   ⏳ No active slip yet: {b.bill_number}')
-            actionable = slip_open if slip_open else hearing_soon
-        else:
-            # Without live check: bills with hearings on calendar, then all in-committee, then all matched
-            actionable = hearing_soon if hearing_soon else (in_committee if in_committee else topic_matched)
+            if slip_open:
+                actionable = slip_open
 
 
     # ── Group by category for display ───────────────────────────────────────────────
