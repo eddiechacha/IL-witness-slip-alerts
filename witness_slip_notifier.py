@@ -1051,6 +1051,26 @@ def main():
 
     if args.feed:
         actionable = [b for b in bills if b.subjects]
+        # ── Always cross-reference ILGA hearing calendar, even in feed/stub mode ──
+        # Without this, STC stubs never get hearing dates because the calendar
+        # scrape only ran inside the --data-dir branch below.
+        print('📅 Fetching ILGA committee hearing calendar...')
+        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        if bill_hearings:
+            print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
+            matched = []
+            for b in actionable:
+                norm = re.sub(r'\s+', '', b.bill_number.upper())
+                if norm in bill_hearings:
+                    b.committee_hearing_date = bill_hearings[norm]
+                    matched.append(b)
+                    print(f'   📅 {b.bill_number}: hearing {b.committee_hearing_date.strftime("%b %-d %I:%M%p")}')
+            if matched:
+                print(f'   ✅ {len(matched)} tracked bills have hearings on the calendar')
+            else:
+                print('   ℹ️  No tracked bills on the hearing schedule right now')
+        else:
+            print('   ⚠️  Could not fetch hearing calendar')
     else:
         # Step 1: topic match
         topic_matched = [b for b in bills

@@ -32,57 +32,15 @@ jobs:
         run: |
           python witness_slip_notifier.py --mode github-action
           python3 - <<'PYEOF'
-          import json, datetime, pathlib, urllib.request, re, ast
+          import json, datetime, pathlib
 
-          # ── Load base bill output from notifier ────────────────────────
+          # ── Load bill output written by the notifier ───────────────────
+          # witness_slip_notifier.py already merges STC_TRACKED_BILLS into
+          # witness_slip_notifications.json, so we do not fetch or parse a
+          # remote notifier source here.
           src = pathlib.Path('witness_slip_notifications.json')
           bills = json.loads(src.read_text()) if src.exists() else []
-
-          # ── Auto-sync STC tracked bills from govbot repo ───────────────
-          # Fetches STC_TRACKED_BILLS directly from the il-witness-slip-poc
-          # branch so the site reflects STC's live priority list automatically.
-          STC_TRACKED_BILLS = {}
-          try:
-              raw_url = (
-                  'https://raw.githubusercontent.com/chihacknight/govbot/'
-                  'il-witness-slip-poc/witness_slip_notifier.py'
-              )
-              with urllib.request.urlopen(raw_url, timeout=10) as r:
-                  source = r.read().decode()
-              m = re.search(
-                  r'STC_TRACKED_BILLS\s*=\s*(\{.*?^\})',
-                  source, re.S | re.M
-              )
-              if m:
-                  STC_TRACKED_BILLS = ast.literal_eval(m.group(1))
-                  print(f'Auto-synced {len(STC_TRACKED_BILLS)} STC bills from govbot')
-              else:
-                  print('WARNING: Could not parse STC_TRACKED_BILLS from govbot source')
-          except Exception as e:
-              print(f'WARNING: STC auto-sync failed ({e}), using notifier output only')
-
-          # Merge — add any STC bills not already in the list
-          existing_nums = {b['bill_number'] for b in bills}
-          for bill_num, (cat, desc, stance) in STC_TRACKED_BILLS.items():
-              if bill_num not in existing_nums:
-                  doc_type = 'HB' if bill_num.startswith('H') else 'SB'
-                  num_only = re.sub(r'[^\d]', '', bill_num)
-                  bills.append({
-                      'bill_number': bill_num,
-                      'chamber': 'House' if bill_num.startswith('H') else 'Senate',
-                      'title': desc,
-                      'category': cat,
-                      'stance': stance,
-                      'witness_slip_url': (
-                          f'https://www.ilga.gov/legislation/BillStatus.asp'
-                          f'?DocTypeID={doc_type}&DocNum={num_only}'
-                          f'&GAID=18&SessionID=114#tab=witnessSlips'
-                      ),
-                      'committee_hearing_date': None,
-                      'committee_name': None,
-                      'source': 'stc_tracked',
-                  })
-          print(f'Total bills after STC sync: {len(bills)}')
+          print(f'Loaded {len(bills)} bills from notifier output')
 
           # ── Illinois legislative session status ────────────────────────
           # 104th GA: spring session Jan–May, veto session ~Nov 10–20.
