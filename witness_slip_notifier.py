@@ -523,66 +523,100 @@ class OpenStatesParser:
             return None
     @staticmethod
     def scrape_ilga_bill_hearings() -> dict:
-        """Scrape upcoming bill hearings from ILGA's Schedules/Legislation pages.
+        """Scrape upcoming bill hearings from all active ILGA committee hearing pages.
 
-        Returns a dict of {bill_number_upper: datetime} mapping each bill that
-        has a scheduled committee hearing to its next hearing date/time.
-
-        ILGA publishes two clean tables at:
-          https://ilga.gov/House/Schedules/Legislation
-          https://ilga.gov/Senate/Schedules/Legislation
-
-        Each row contains the bill number, committee name, date, and time —
-        scraped directly so no fuzzy committee-name matching is needed.
+        Strategy:
+          1. Fetch House and Senate committee index pages.
+          2. Discover committee hearing pages from those indexes.
+          3. Fetch hearing detail pages linked from each committee page.
+          4. Scan the full detail-page HTML for bill IDs, including bills listed
+             under Subject Matter where ILGA may concatenate identifiers.
         """
         import re
-        bill_hearings = {}  # bill_number -> datetime
 
-        # Matches e.g. "04/07/2026" or "4/7/2026" with optional time "2:00PM"
+        bill_hearings = {}
+        headers = {'User-Agent': 'govbot-urbanist/1.0'}
+
+        committee_link_re = re.compile(
+            r'href=["\']/(House|Senate)/Committees/Hearings/([^"\']+)["\']',
+            re.I,
+        )
+        detail_href_re = re.compile(
+            r'href=["\']([^"\']*/hearings/details/[^"\']+)["\']',
+            re.I,
+        )
         date_re = re.compile(
-            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?', re.I)
-        # Matches bill identifiers like HB1234, SB567, HR12, SR3
-        bill_re = re.compile(r'\b([HS][BCR]\d+)\b', re.I)
+            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?',
+            re.I,
+        )
+        # No trailing word boundary: ILGA can concatenate values like
+        # "SB 2912SB 3084SB 3187" in Subject Matter.
+        bill_re = re.compile(r'([HS][BCR]\s*\d+)', re.I)
 
-        for chamber in ('House', 'Senate'):
-            url = f'https://ilga.gov/{chamber}/Schedules/Legislation'
+        committee_index_urls = [
+            'https://ilga.gov/Senate/Committees',
+            'https://ilga.gov/House/Committees',
+        ]
+
+        committee_pages = []
+        seen_committee_pages = set()
+
+        for index_url in committee_index_urls:
             try:
-                resp = requests.get(url, timeout=20,
-                                    headers={'User-Agent': 'govbot-urbanist/1.0'})
+                resp = requests.get(index_url, timeout=20, headers=headers)
                 resp.raise_for_status()
             except Exception as e:
-                print(f'   ⚠️  Could not fetch {url}: {e}')
+                print(f'   ⚠️  Could not fetch {index_url}: {e}')
                 continue
 
-            # The page is an HTML table. Walk every line looking for bill IDs
-            # adjacent to a date. ILGA's table has bill number and date in the
-            # same <tr>, so we accumulate context within a small window.
-            lines = resp.text.splitlines()
-            for i, line in enumerate(lines):
-                bm = bill_re.search(line)
-                if not bm:
+            for match in committee_link_re.finditer(resp.text):
+                chamber = match.group(1)
+                code = match.group(2).strip()
+                committee_url = f'https://ilga.gov/{chamber}/Committees/Hearings/{code}'
+                if committee_url not in seen_committee_pages:
+                    seen_committee_pages.add(committee_url)
+                    committee_pages.append(committee_url)
+
+        seen_detail_urls = set()
+
+        for committee_url in committee_pages:
+            try:
+                resp = requests.get(committee_url, timeout=20, headers=headers)
+                resp.raise_for_status()
+            except Exception:
+                continue
+
+            for href in detail_href_re.findall(resp.text):
+                detail_url = href if href.startswith('http') else f'https://ilga.gov{href}'
+                if detail_url in seen_detail_urls:
                     continue
-                bill_id = bm.group(1).upper()
-                # Look for a date in the same line or the next 5 lines
-                window = ' '.join(lines[i:i+6])
-                dm = date_re.search(window)
+                seen_detail_urls.add(detail_url)
+
+                try:
+                    dresp = requests.get(detail_url, timeout=20, headers=headers)
+                    dresp.raise_for_status()
+                except Exception:
+                    continue
+
+                detail_text = dresp.text
+                dm = date_re.search(detail_text)
                 if not dm:
                     continue
+
                 date_str = dm.group(1)
-                time_str = dm.group(2) or '12:00 PM'
+                time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
                 try:
-                    dt = datetime.strptime(
-                        f'{date_str} {time_str.replace(" ", "")}',
-                        '%m/%d/%Y %I:%M%p'
-                    )
+                    dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
                 except ValueError:
                     try:
                         dt = datetime.strptime(date_str, '%m/%d/%Y')
                     except ValueError:
                         continue
-                # Keep earliest upcoming hearing per bill
-                if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
-                    bill_hearings[bill_id] = dt
+
+                for bill_match in bill_re.finditer(detail_text):
+                    bill_id = re.sub(r'\s+', '', bill_match.group(1).upper())
+                    if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
+                        bill_hearings[bill_id] = dt
 
         return bill_hearings
 
