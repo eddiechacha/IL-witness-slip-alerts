@@ -603,101 +603,72 @@ class OpenStatesParser:
 
     @staticmethod
     def scrape_ilga_bill_hearings() -> dict:
-        """Scrape upcoming bill hearings from ILGA committee hearing pages.
+        """Fetch upcoming bill hearings from the ILGA hearing schedule JSON API.
 
         Strategy:
-          1. Fetch House and Senate committee index pages.
-          2. Parse committee codes from markdown-style table rows.
-          3. Keep only committees whose status is Scheduled.
-          4. Build committee hearing pages from those codes.
-          5. Fetch hearing detail links from each committee page.
-          6. Fall back to seeded detail URLs if discovery yields nothing.
-
-        Returns:
-          dict mapping normalized bill id -> (hearing datetime, detail URL)
+          1. Call /API/Hearings/GetHearingsListByRange for Senate (ChamberId=1)
+             and House (ChamberId=2) covering today + 60 days.
+          2. Each API record contains a HearingId and CommitteeId; build the
+             detail URL as /Senate/hearings/details/{CommitteeId}/{HearingId}.
+          3. Fetch each detail page and scan for bill numbers.
+          4. Return dict mapping normalized bill id -> (datetime, detail_url).
         """
         import re
 
-        bill_hearings = {}
+        bill_hearings: dict = {}
         headers = {'User-Agent': 'govbot-urbanist/1.0'}
+        bill_re = re.compile(r'\b([HS][BCR]\s*\d+)\b', re.I)
 
-        table_row_re = re.compile(
-            r'^\|\s*([^|]+?)\s*\|\s*([A-Z]{2,6})\s*\|\s*([^|]+?)\s*\|?\s*$',
-            re.M,
-        )
-        detail_href_re = re.compile(
-            r'href=["\']([^"\']*/hearings/details/[^"\']+)["\']',
-            re.I,
-        )
-        date_re = re.compile(
-            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?',
-            re.I,
-        )
-        bill_re = re.compile(r'([HS][BCR]\s*\d+)', re.I)
+        today    = datetime.now().strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=60)).strftime('%Y-%m-%d')
 
-        committee_index_urls = [
-            ('Senate', 'https://ilga.gov/Senate/Committees'),
-            ('House', 'https://ilga.gov/House/Committees'),
-        ]
+        # Chamber name -> ChamberId mapping
+        chambers = [('Senate', 1), ('House', 2)]
 
-        seeded_detail_urls = [
-            'https://ilga.gov/Senate/committees/hearings/details/45748',
-            'https://ilga.gov/House/committees/hearings/details/45747',
-        ]
+        detail_urls: list = []
+        seen_detail_urls: set = set()
 
-        committee_pages = []
-        seen_committee_pages = set()
-
-        for chamber, index_url in committee_index_urls:
+        for chamber_name, chamber_id in chambers:
+            api_url = (
+                f'https://ilga.gov/API/Hearings/GetHearingsListByRange'
+                f'?ChamberId={chamber_id}&GaId=18'
+                f'&BeginDate={today}&EndDate={end_date}'
+            )
             try:
-                resp = requests.get(index_url, timeout=20, headers=headers)
+                resp = requests.get(api_url, timeout=20, headers=headers)
                 resp.raise_for_status()
+                hearings = resp.json()
             except Exception as e:
-                print(f'   ⚠️ Could not fetch {index_url}: {e}')
-                continue
+                print(f'   ⚠️ Could not fetch {chamber_name} hearing API: {e}')
+                hearings = []
 
-            scheduled_codes = []
-            for match in table_row_re.finditer(resp.text):
-                code = match.group(2).strip().upper()
-                status = match.group(3).strip().lower()
-                if status == 'scheduled':
-                    scheduled_codes.append(code)
+            if not isinstance(hearings, list):
+                print(f'   ⚠️ Unexpected API response for {chamber_name}: {type(hearings)}')
+                hearings = []
 
-            print(f'   {chamber}: parsed {len(scheduled_codes)} scheduled committees')
+            print(f'   {chamber_name}: API returned {len(hearings)} hearing(s)')
 
-            for code in scheduled_codes:
-                committee_url = f'https://ilga.gov/{chamber}/Committees/Hearings/{code}'
-                if committee_url not in seen_committee_pages:
-                    seen_committee_pages.add(committee_url)
-                    committee_pages.append(committee_url)
-
-        print(f'   Discovered {len(committee_pages)} committee hearing pages')
-
-        seen_detail_urls = set()
-        detail_urls = []
-
-        for committee_url in committee_pages:
-            try:
-                resp = requests.get(committee_url, timeout=20, headers=headers)
-                resp.raise_for_status()
-            except Exception as e:
-                print(f'   ⚠️ Could not fetch committee page {committee_url}: {e}')
-                continue
-
-            for href in detail_href_re.findall(resp.text):
-                detail_url = href if href.startswith('http') else f'https://ilga.gov{href}'
+            for h in hearings:
+                # API record fields (observed): HearingId, CommitteeId, HearingDate,
+                # CommitteeName, Location, etc.  Key names may vary — try both cases.
+                hearing_id   = h.get('HearingId')   or h.get('hearingId')   or h.get('id')
+                committee_id = h.get('CommitteeId') or h.get('committeeId')
+                if not hearing_id:
+                    continue
+                if committee_id:
+                    detail_url = (
+                        f'https://ilga.gov/{chamber_name}/hearings/details'
+                        f'/{committee_id}/{hearing_id}'
+                    )
+                else:
+                    detail_url = (
+                        f'https://ilga.gov/{chamber_name}/hearings/details/{hearing_id}'
+                    )
                 if detail_url not in seen_detail_urls:
                     seen_detail_urls.add(detail_url)
                     detail_urls.append(detail_url)
 
-        print(f'   Discovered {len(detail_urls)} hearing detail pages from committees')
-
-        if not detail_urls:
-            print('   ⚠️ No hearing detail pages discovered; using seeded fallback URLs')
-            for url in seeded_detail_urls:
-                if url not in seen_detail_urls:
-                    seen_detail_urls.add(url)
-                    detail_urls.append(url)
+        print(f'   Fetching {len(detail_urls)} hearing detail page(s)...')
 
         for detail_url in detail_urls:
             try:
@@ -708,36 +679,49 @@ class OpenStatesParser:
                 continue
 
             detail_text = dresp.text
-            dm = date_re.search(detail_text)
-            if not dm:
-                print(f'   ⚠️ No date found on hearing detail {detail_url}')
+
+            # Parse date — try ISO first (from JSON embeds), then US format
+            dt = None
+            iso_m = re.search(r'(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})', detail_text)
+            us_m  = re.search(
+                r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?',
+                detail_text, re.I,
+            )
+            if iso_m:
+                try:
+                    dt = datetime.strptime(
+                        f'{iso_m.group(1)} {iso_m.group(2)}', '%Y-%m-%d %H:%M'
+                    )
+                except ValueError:
+                    pass
+            if dt is None and us_m:
+                date_str = us_m.group(1)
+                time_str = (us_m.group(2) or '12:00 PM').replace(' ', '')
+                try:
+                    dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
+                except ValueError:
+                    try:
+                        dt = datetime.strptime(date_str, '%m/%d/%Y')
+                    except ValueError:
+                        pass
+            if dt is None:
+                print(f'   ⚠️ No date found on {detail_url}')
                 continue
 
-            date_str = dm.group(1)
-            time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
-            try:
-                dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
-            except ValueError:
-                try:
-                    dt = datetime.strptime(date_str, '%m/%d/%Y')
-                except ValueError:
-                    print(f'   ⚠️ Could not parse hearing date on {detail_url}: {date_str} {time_str}')
-                    continue
-
-            matched_bill_count = 0
+            matched = 0
             for bill_match in bill_re.finditer(detail_text):
-                bill_id = re.sub(r'\s+', '', bill_match.group(1).upper())
+                bill_id  = re.sub(r'\s+', '', bill_match.group(1).upper())
                 existing = bill_hearings.get(bill_id)
                 if existing is None or dt < existing[0]:
                     bill_hearings[bill_id] = (dt, detail_url)
-                matched_bill_count += 1
+                matched += 1
 
             print(
-                f'   📄 {detail_url} -> {matched_bill_count} bill refs '
+                f'   📄 {detail_url} → {matched} bill ref(s) '
                 f'for {dt.strftime("%b %-d %I:%M%p")}'
             )
 
-        print(f'   Parsed {len(bill_hearings)} unique bills from hearing calendar')
+        print(f'   Parsed {len(bill_hearings)} unique bill(s) from hearing calendar')
         return bill_hearings
 
 
