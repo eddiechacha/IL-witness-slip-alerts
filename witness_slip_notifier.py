@@ -334,18 +334,19 @@ class OpenStatesParser:
     def parse_data_directory(data_dir: str) -> List[Bill]:
         print(f"📂 Parsing OpenStates data from: {data_dir}")
         data_path = Path(data_dir)
-        
+
         if not data_path.exists():
             print(f"❌ Data directory not found: {data_dir}")
             return []
-        
+
+        # govbot-openstates-scrapers layout: flat bill_<uuid>.json files
+        # Legacy govbot layout: subdirectories each containing metadata.json
+        flat_files = list(data_path.glob("bill_*.json"))
+        nested_files = list(data_path.glob("*/metadata.json"))
+        bill_files = flat_files if flat_files else nested_files
+        flat_mode = bool(flat_files)
+
         bills = []
-        # Each bill lives in its own subdirectory with a metadata.json.
-        # That single file contains the bill's title, subjects, actions,
-        # sponsorships, and ILGA source URL — everything we need.
-        # The other JSON files under each bill dir are govbot log-event
-        # files; they contain no subject/category data and should be skipped.
-        bill_files = list(data_path.glob("*/metadata.json"))
 
         print(f"📄 Found {len(bill_files)} bills (metadata.json files)")
 
