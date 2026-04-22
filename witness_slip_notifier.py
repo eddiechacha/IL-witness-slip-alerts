@@ -497,8 +497,10 @@ class OpenStatesParser:
         bill_re = re.compile(r'([HS][BCR]\s*-?\s*\d{1,5})', re.I)
         table_row_re = re.compile(r'^\|([^|]+)\|([A-Z]{2,6})\|([^|]+)\|?$', re.M)
         detail_href_re = re.compile(
-            r"href=['"]((?:[^'"]*(?:hearings/details|HearingDetails)[^'"]*))['"]" ,
-            re.I)
+        r'href="([^"]*(?:hearings/details|HearingDetails)[^"]*)"|href=\'([^\']*(?:hearings/details|HearingDetails)[^\']*)\'' ,
+        re.I)
+
+
 
         seeded_detail_urls = [
             'https://ilga.gov/Senate/committees/hearings/details/45748',
@@ -547,7 +549,10 @@ class OpenStatesParser:
             except Exception as e:
                 print(f'   ⚠️  Could not fetch {committee_url}: {e}')
                 continue
-            for href in detail_href_re.findall(resp.text):
+            for match in detail_href_re.findall(resp.text):
+                href = match[0] or match[1]
+                if not href:
+                    continue
                 detail_url = (href if href.startswith('http')
                               else f'https://ilga.gov{href}')
                 if detail_url not in seen_detail_urls:
