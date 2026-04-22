@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-22T13:27:31Z",
+  "generated_at": "2026-04-22T13:45:34Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "active",
   "session_message": "Spring session is active (Jan–May). Legislators are in Springfield — your witness slip matters now!",
@@ -137,17 +137,6 @@
       "source": "stc_tracked"
     },
     {
-      "bill_number": "HB2454",
-      "chamber": "House",
-      "title": "Adds bicycles as intended users of roadways",
-      "category": "Biking",
-      "stance": "Proponent",
-      "witness_slip_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=2454&GAID=18&SessionID=114#tab=witnessSlips",
-      "committee_hearing_date": null,
-      "committee_name": null,
-      "source": "stc_tracked"
-    },
-    {
       "bill_number": "HB4660",
       "chamber": "House",
       "title": "Idaho Stop — legalizes yield-at-stop for cyclists",
@@ -165,17 +154,6 @@
       "category": "Biking",
       "stance": "Proponent",
       "witness_slip_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=4925&GAID=18&SessionID=114#tab=witnessSlips",
-      "committee_hearing_date": null,
-      "committee_name": null,
-      "source": "stc_tracked"
-    },
-    {
-      "bill_number": "HB2934",
-      "chamber": "House",
-      "title": "Lowers urban speed limit 30→20 mph / alley 15→10 mph",
-      "category": "Safe Streets",
-      "stance": "Proponent",
-      "witness_slip_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=2934&GAID=18&SessionID=114#tab=witnessSlips",
       "committee_hearing_date": null,
       "committee_name": null,
       "source": "stc_tracked"
