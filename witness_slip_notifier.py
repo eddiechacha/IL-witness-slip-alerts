@@ -75,6 +75,8 @@ STC_SHEET_CSV_URL = (
 STC_CACHE_PATH = Path("cache/stc_tracked_bills.json")
 STC_CACHE_TTL  = 12 * 60 * 60  # 12 hours
 
+HEARINGS_CACHE_PATH = Path("cache/ilga_hearings.json")
+
 
 def _normalize_bill_id(raw: str) -> Optional[str]:
     """Normalize a raw bill string like 'HB 2454' or 'sb4061' -> 'HB2454'."""
@@ -83,6 +85,25 @@ def _normalize_bill_id(raw: str) -> Optional[str]:
     s = re.sub(r"[^A-Za-z0-9]", "", str(raw).strip().upper())
     m = re.match(r"^(HB|SB|HR|SR|HJR|SJR|HJRCA|SJRCA)(\d+)$", s)
     return f"{m.group(1)}{m.group(2)}" if m else (s or None)
+
+
+def _normalize_category_name(raw: str) -> str:
+    """Map free-form STC category labels into canonical buckets used by the UI."""
+    if not raw:
+        return "Other"
+    s = str(raw).strip()
+    low = s.lower()
+    if "housing" in low:
+        return "Housing"
+    if any(k in low for k in ("bike", "bicycl", "e-bike", "cycling")):
+        return "Biking"
+    if any(k in low for k in ("transit", "cta", "metra", "rail", "bus", "train")):
+        return "Transit"
+    if any(k in low for k in ("street", "safety", "speed", "vision zero")):
+        return "Safe Streets"
+    if any(k in low for k in ("transport", "parking")):
+        return "Transportation"
+    return s or "Other"
 
 
 def _fetch_stc_sheet() -> dict:
@@ -100,8 +121,9 @@ def _fetch_stc_sheet() -> dict:
         bill_id = _normalize_bill_id(raw_id)
         if not bill_id:
             continue
-        category = (norm.get("category") or norm.get("topic") or
-                    norm.get("issue") or "Tracked Bills").strip()
+        raw_category = (norm.get("category") or norm.get("topic") or
+                        norm.get("issue") or "Tracked Bills").strip()
+        category = _normalize_category_name(raw_category)
         description = (norm.get("description") or norm.get("bill details") or
                        norm.get("details") or norm.get("summary") or
                        norm.get("title") or bill_id).strip()
@@ -1285,7 +1307,49 @@ def main():
         # Bills without a hearing just show on the watchlist; they are never
         # dropped from the digest.
         print('📅 Fetching ILGA committee hearing calendar...')
-        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        bill_hearings = {}
+        if HEARINGS_CACHE_PATH.exists():
+            bill_hearings = {}
+            try:
+                cached = json.loads(HEARINGS_CACHE_PATH.read_text(encoding="utf-8"))
+                now_dt = datetime.now()
+                for bill_id, entry in cached.get("bills", {}).items():
+                    dt_str = entry.get("hearing_date")
+                    slip = entry.get("slip_url") or entry.get("detail_url")
+                    if not dt_str or not slip:
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(dt_str)
+                    except ValueError:
+                        continue
+                    if dt >= now_dt:
+                        bill_hearings[bill_id] = (dt, slip)
+                if bill_hearings:
+                    print(f"   📁 Loaded {len(bill_hearings)} hearings from cache")
+            except Exception:
+                bill_hearings = {}
+        fresh_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        if fresh_hearings:
+            for bill_id, (dt, slip_url) in fresh_hearings.items():
+                existing = bill_hearings.get(bill_id)
+                if existing is None or dt < existing[0]:
+                    bill_hearings[bill_id] = (dt, slip_url)
+            HEARINGS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            HEARINGS_CACHE_PATH.write_text(
+                json.dumps(
+                    {
+                        "updated_at": datetime.now().isoformat(),
+                        "bills": {
+                            k: {"hearing_date": v[0].isoformat(), "slip_url": v[1]}
+                            for k, v in bill_hearings.items()
+                        },
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            print(f"   📁 Saved {len(bill_hearings)} hearings to cache")
         if bill_hearings:
             print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
             matched = []
@@ -1308,7 +1372,49 @@ def main():
         actionable = [b for b in bills if b.subjects]
 
         print('📅 Fetching ILGA committee hearing calendar...')
-        bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        bill_hearings = {}
+        if HEARINGS_CACHE_PATH.exists():
+            bill_hearings = {}
+            try:
+                cached = json.loads(HEARINGS_CACHE_PATH.read_text(encoding="utf-8"))
+                now_dt = datetime.now()
+                for bill_id, entry in cached.get("bills", {}).items():
+                    dt_str = entry.get("hearing_date")
+                    slip = entry.get("slip_url") or entry.get("detail_url")
+                    if not dt_str or not slip:
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(dt_str)
+                    except ValueError:
+                        continue
+                    if dt >= now_dt:
+                        bill_hearings[bill_id] = (dt, slip)
+                if bill_hearings:
+                    print(f"   📁 Loaded {len(bill_hearings)} hearings from cache")
+            except Exception:
+                bill_hearings = {}
+        fresh_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
+        if fresh_hearings:
+            for bill_id, (dt, slip_url) in fresh_hearings.items():
+                existing = bill_hearings.get(bill_id)
+                if existing is None or dt < existing[0]:
+                    bill_hearings[bill_id] = (dt, slip_url)
+            HEARINGS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            HEARINGS_CACHE_PATH.write_text(
+                json.dumps(
+                    {
+                        "updated_at": datetime.now().isoformat(),
+                        "bills": {
+                            k: {"hearing_date": v[0].isoformat(), "slip_url": v[1]}
+                            for k, v in bill_hearings.items()
+                        },
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            print(f"   📁 Saved {len(bill_hearings)} hearings to cache")
         if bill_hearings:
             print(f'   Found {len(bill_hearings)} bills with scheduled hearings')
             matched = []
@@ -1379,8 +1485,7 @@ def main():
             f'<a href="{slip_url}" style="margin-right:8px;color:#166534;font-weight:bold">'
             f'📋 File Witness Slip</a>'
             if has_hearing else
-            f'<span style="color:#9ca3af;font-size:0.9em" title="No hearing scheduled yet">'
-            f'📋 Witness slip not open yet</span>'
+            ''
         )
         lines_h.append(
             f'<li style="margin-bottom:12px">'
