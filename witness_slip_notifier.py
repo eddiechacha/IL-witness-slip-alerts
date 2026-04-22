@@ -459,10 +459,17 @@ class OpenStatesParser:
         print(f"📂 Parsing OpenStates data from: {data_dir}")
         data_path = Path(data_dir)
 
+        # Auto-descend into _data/il/ if the caller passed the repo root
+        for candidate in [data_path, data_path / "_data" / "il"]:
+            if candidate.exists() and any(candidate.glob("bill_*.json")):
+                data_path = candidate
+                break
+
         if not data_path.exists():
             print(f"❌ Data directory not found: {data_dir}")
             return []
 
+        print(f"📂 Resolved bill data path: {data_path}")
         bills = []
         bill_files = sorted(data_path.glob("bill_*.json"))
 
