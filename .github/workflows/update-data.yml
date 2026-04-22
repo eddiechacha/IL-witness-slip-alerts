@@ -23,6 +23,31 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Get today's date for cache key
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Restore il-legislation cache
+        id: cache-il
+        uses: actions/cache@v4
+        with:
+          path: .govbot/repos/il-legislation
+          key: il-legislation-${{ steps.date.outputs.date }}
+          restore-keys: il-legislation-
+
+      - name: Clone or update il-legislation repo
+        run: |
+          mkdir -p .govbot/repos
+          if [ -d ".govbot/repos/il-legislation/.git" ]; then
+            echo "Repo cached, pulling latest..."
+            git -C .govbot/repos/il-legislation pull --ff-only || true
+          else
+            echo "Fresh clone..."
+            git clone --depth=1 \
+              https://github.com/govbot-openstates-scrapers/il-legislation.git \
+              .govbot/repos/il-legislation
+          fi
+
       - name: Run notifier — write bills.json
         env:
           USER_NAME: ${{ secrets.USER_NAME }}
@@ -30,7 +55,8 @@ jobs:
           USER_ORG: ${{ secrets.USER_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python witness_slip_notifier.py --mode github-action
+          DATA_DIR=".govbot/repos/il-legislation/country:us/state:il/sessions/104th/bills"
+          python witness_slip_notifier.py --mode github-action --data-dir "$DATA_DIR"
           python3 - <<'PYEOF'
           import json, datetime, pathlib
 

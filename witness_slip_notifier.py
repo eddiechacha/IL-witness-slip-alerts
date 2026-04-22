@@ -1125,10 +1125,12 @@ def main():
     now = datetime.now()
 
     if args.feed:
+        # ALL bills with a subject tag are actionable — hearing or not.
+        # STC stubs always have a subject, so every tracked bill appears.
         actionable = [b for b in bills if b.subjects]
-        # ── Always cross-reference ILGA hearing calendar, even in feed/stub mode ──
-        # Without this, STC stubs never get hearing dates because the calendar
-        # scrape only ran inside the --data-dir branch below.
+        # ── Cross-reference ILGA hearing calendar to enrich hearing dates ──
+        # Bills without a hearing just show on the watchlist; they are never
+        # dropped from the digest.
         print('📅 Fetching ILGA committee hearing calendar...')
         bill_hearings = OpenStatesParser.scrape_ilga_bill_hearings()
         if bill_hearings:
@@ -1145,7 +1147,7 @@ def main():
             else:
                 print('   ℹ️  No tracked bills on the hearing schedule right now')
         else:
-            print('   ⚠️  Could not fetch hearing calendar')
+            print('   ⚠️  Could not fetch hearing calendar — showing all tracked bills on watchlist')
     else:
         # Step 1: topic match
         topic_matched = [b for b in bills
@@ -1228,22 +1230,39 @@ def main():
                           'Bills on the watchlist are shown below.</em></p>')
 
     def render_bill(b, lines_t, lines_h):
-        slip_url = b.get_witness_slip_url()
-        stance   = getattr(b, 'stance', 'Proponent')
-        emoji    = '👍' if stance == 'Proponent' else '🚫'
-        hearing  = (b.committee_hearing_date.strftime('🗓 Hearing: %b %-d, %Y %I:%M %p')
-                    if b.committee_hearing_date else '')
-        cmt      = f' ({b.committee_name})' if b.committee_name else ''
+        # Witness slip URL is only meaningful when a hearing is confirmed.
+        # Without a hearing, the slip form doesn't exist yet.
+        has_hearing = bool(b.committee_hearing_date)
+        slip_url    = b.ilga_url if has_hearing else None
+        bill_url    = b.get_bill_status_url()
+        stance      = getattr(b, 'stance', 'Proponent')
+        emoji       = '👍' if stance == 'Proponent' else '🚫'
+        hearing     = (b.committee_hearing_date.strftime('🗓 Hearing: %b %-d, %Y %I:%M %p')
+                       if has_hearing else '')
+        cmt         = f' ({b.committee_name})' if b.committee_name else ''
+
+        # Plain text — only show slip link when there's a hearing
+        slip_line = f'     Witness slip: {slip_url}' if has_hearing else '     No hearing scheduled yet'
         lines_t.append(
             f'  {emoji} {b.bill_number}: {b.title[:70]}\n'
             f'     Stance: {stance}{(" | " + hearing) if hearing else ""}\n'
-            f'     Witness slip: {slip_url}'
+            + slip_line
+        )
+
+        # HTML — "File Witness Slip" only when hearing confirmed; always show ILGA page
+        slip_btn = (
+            f'<a href="{slip_url}" style="margin-right:8px;color:#166534;font-weight:bold">'
+            f'📋 File Witness Slip</a>'
+            if has_hearing else
+            f'<span style="color:#9ca3af;font-size:0.9em" title="No hearing scheduled yet">'
+            f'📋 Witness slip not open yet</span>'
         )
         lines_h.append(
-            f'<li style="margin-bottom:10px">'
+            f'<li style="margin-bottom:12px">'
             f'<strong>{b.bill_number}</strong> ({stance}) — {b.title[:80]}'
             f'{"<br><small>" + hearing + cmt + "</small>" if hearing else ""}'
-            f'<br><a href="{slip_url}">📝 File Witness Slip</a></li>'
+            f'<br style="margin-bottom:4px">{slip_btn} '
+            f'<a href="{bill_url}" style="color:#1d4ed8;font-size:0.9em">🔗 ILGA page</a></li>'
         )
 
     total = 0
@@ -1307,7 +1326,11 @@ def main():
          'title': b.title,
          'category': b.subjects[0] if b.subjects else 'Other',
          'stance': getattr(b, 'stance', 'Proponent'),
-         'witness_slip_url': b.get_witness_slip_url(),
+         # witness_slip_url is only set when a hearing is confirmed.
+         # Without a hearing the slip form doesn't exist; null signals
+         # the frontend to suppress the "File Witness Slip" button.
+         'witness_slip_url': b.ilga_url if b.committee_hearing_date else None,
+         'ilga_url': b.get_bill_status_url(),
          'committee_hearing_date': (
              b.committee_hearing_date.isoformat()
              if b.committee_hearing_date else None),
