@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-22T17:01:26Z",
+  "generated_at": "2026-04-22T17:25:17Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "active",
   "session_message": "Spring session is active (Jan–May). Legislators are in Springfield — your witness slip matters now!",
@@ -10,7 +10,8 @@
       "title": "BUILD Act — Single stair reform",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4061&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -21,7 +22,8 @@
       "title": "BUILD Act — Parking reform (caps minimums)",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4064&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -32,7 +34,8 @@
       "title": "BUILD Act — Impact fee modernization",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4062&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -43,7 +46,8 @@
       "title": "BUILD Act — 2–8 units by right (missing middle)",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4060&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -54,7 +58,8 @@
       "title": "BUILD Act — Legalizes ADUs statewide",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4071&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -65,7 +70,8 @@
       "title": "BUILD Act — Third-party review for housing permits",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=4063&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -76,7 +82,8 @@
       "title": "YIGBY — Faith-based housing & mixed-use by-right",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/House/hearings/details/3111/22832/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/House/hearings/details/3111/22832/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=5083&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-22T10:00:00",
       "committee_name": null,
       "source": "stc_tracked"
@@ -87,7 +94,8 @@
       "title": "YIGBY — Faith-based housing & mixed-use by-right",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip#tab=witnessSlips",
+      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22865/createwitnessslip",
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&DocNum=3187&GAID=18&SessionID=114",
       "committee_hearing_date": "2026-04-23T13:30:00",
       "committee_name": null,
       "source": "stc_tracked"
