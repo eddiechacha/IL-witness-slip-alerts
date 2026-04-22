@@ -463,7 +463,8 @@ class OpenStatesParser:
             print(f"❌ Data directory not found: {data_dir}")
             return []
 
-        bill_re = re.compile(r'([HS][BCR]\s*\d+)', re.I)
+        bills = []
+        bill_files = sorted(data_path.glob("bill_*.json"))
 
         print(f"📄 Found {len(bill_files)} bills (metadata.json files)")
 
