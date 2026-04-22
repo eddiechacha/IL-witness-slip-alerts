@@ -15,6 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch IL OpenStates data
+        run: |
+          # Clone the govbot-openstates-scrapers IL data so the notifier
+          # can cross-reference live bill metadata (subjects, committee, etc.)
+          git clone --depth=1 \
+            https://github.com/govbot-openstates-scrapers/il-legislation.git \
+            _il_legislation
+          mkdir -p data
+          # The scraper stores bills under _data/il/
+          ln -s "$(pwd)/_il_legislation/_data/il" data/il
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -105,5 +116,4 @@ jobs:
           git add -f docs/data/bills.json
           git diff --staged --quiet && exit 0
           git commit -m "chore: update bills.json [skip ci]"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git push --force-with-lease origin HEAD:main
