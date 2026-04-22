@@ -46,12 +46,18 @@ jobs:
           import json, datetime, pathlib
 
           # ── Load bill output written by the notifier ───────────────────
-          # witness_slip_notifier.py already merges STC_TRACKED_BILLS into
-          # witness_slip_notifications.json, so we do not fetch or parse a
-          # remote notifier source here.
-          src = pathlib.Path('witness_slip_notifications.json')
-          bills = json.loads(src.read_text()) if src.exists() else []
-          print(f'Loaded {len(bills)} bills from notifier output')
+          # Prefer the notifier handoff file, but fall back to a mirrored
+          # stable path if the primary filename ever changes.
+          src_candidates = [
+              pathlib.Path('witness_slip_notifications.json'),
+              pathlib.Path('docs/data/bills.source.json'),
+          ]
+          src = next((p for p in src_candidates if p.exists()), None)
+          bills = json.loads(src.read_text()) if src else []
+          if src:
+              print(f'Loaded {len(bills)} bills from notifier output ({src})')
+          else:
+              print('Loaded 0 bills from notifier output (no source file found)')
 
           # ── Illinois legislative session status ────────────────────────
           # 104th GA: spring session Jan–May, veto session ~Nov 10–20.
