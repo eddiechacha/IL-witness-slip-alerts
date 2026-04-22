@@ -348,37 +348,83 @@ class OpenStatesParser:
 
         bills = []
 
-        print(f"📄 Found {len(bill_files)} bills (metadata.json files)")
+        print(f"📄 Found {len(bill_files)} bills ({'flat uuid' if flat_mode else 'metadata.json'} files)")
 
         for bill_file in bill_files:
-            
             try:
                 with open(bill_file, 'r') as f:
                     data = json.load(f)
-                    
-                    if isinstance(data, list):
-                        for bill_data in data:
-                            bill = OpenStatesParser._parse_bill(bill_data)
-                            if bill:
-                                bills.append(bill)
-                    else:
-                        bill = OpenStatesParser._parse_bill(data)
-                        if bill:
-                            bills.append(bill)
-            except Exception as e:
-                print(f"⚠️  Error parsing {bill_file.name}: {e}")
+
+                if flat_mode:
+                    # govbot-openstates-scrapers schema: flat bill_<uuid>.json
+                    bill_number = data.get('identifier', '').strip().upper()
+                    if not bill_number or not re.match(r'^[HS][BR]\d+$', bill_number):
+                        continue
+
+                    org = data.get('from_organization', '')
+                    chamber = Chamber.SENATE if 'upper' in org else Chamber.HOUSE
+
+                    title = data.get('title', 'Unknown Title')
+
+                    sponsor = 'Unknown'
+                    for sp in data.get('sponsorships', []):
+                        if sp.get('primary'):
+                            sponsor = sp.get('name', 'Unknown')
+                            break
+
+                    subjects = data.get('subject', [])  # list of strings
+
+                    ilga_url = ''
+                    sources = data.get('sources', [])
+                    if sources:
+                        ilga_url = sources[0].get('url', '')
+
+                else:
+                    # Legacy metadata.json schema
+                    bill_number = data.get('bill_number', '').strip().upper()
+                    if not bill_number:
+                        continue
+
+                    chamber_str = data.get('chamber', '').lower()
+                    chamber = Chamber.HOUSE if 'house' in chamber_str else Chamber.SENATE
+                    title = data.get('title', 'Unknown Title')
+                    sponsor = data.get('primary_sponsor', 'Unknown')
+                    subjects = data.get('subjects', [])
+                    ilga_url = data.get('sources', [{}])[0].get('url', '') if data.get('sources') else ''
+
+                actions = data.get('actions', [])
+                reading = BillReading.FIRST
+                for action in reversed(actions):
+                    desc = action.get('description', '').lower()
+                    if 'third reading' in desc:
+                        reading = BillReading.THIRD
+                        break
+                    elif 'second reading' in desc:
+                        reading = BillReading.SECOND
+                        break
+
+                bill = Bill(
+                    bill_number=bill_number,
+                    chamber=chamber,
+                    title=title,
+                    sponsor=sponsor,
+                    next_reading=reading,
+                    subjects=subjects,
+                    ilga_url=ilga_url,
+                )
+                bills.append(bill)
+
+            except (json.JSONDecodeError, KeyError):
                 continue
-        
-        # Deduplicate
-        seen = set()
-        unique_bills = []
+
+        seen: dict = {}
         for bill in bills:
             if bill.bill_number not in seen:
-                seen.add(bill.bill_number)
-                unique_bills.append(bill)
-        
-        print(f"✅ Parsed {len(unique_bills)} unique bills")
-        return unique_bills
+                seen[bill.bill_number] = bill
+        bills = list(seen.values())
+        print(f"✅ Parsed {len(bills)} unique bills")
+        return bills
+
     
     @staticmethod
     def _parse_bill(bill_data: dict) -> Optional[Bill]:
@@ -477,94 +523,66 @@ class OpenStatesParser:
             return None
     @staticmethod
     def scrape_ilga_bill_hearings() -> dict:
-        """Scrape upcoming bill hearings from all active ILGA committee hearing pages."""
+        """Scrape upcoming bill hearings from ILGA's Schedules/Legislation pages.
+
+        Returns a dict of {bill_number_upper: datetime} mapping each bill that
+        has a scheduled committee hearing to its next hearing date/time.
+
+        ILGA publishes two clean tables at:
+          https://ilga.gov/House/Schedules/Legislation
+          https://ilga.gov/Senate/Schedules/Legislation
+
+        Each row contains the bill number, committee name, date, and time —
+        scraped directly so no fuzzy committee-name matching is needed.
+        """
         import re
+        bill_hearings = {}  # bill_number -> datetime
 
-        bill_hearings = {}
-        headers = {'User-Agent': 'govbot-urbanist/1.0'}
-
-        committee_link_re = re.compile(
-            r'href=["\']/(House|Senate)/Committees/Hearings/([^"\']+)["\']',
-            re.I,
-        )
-        detail_href_re = re.compile(
-            r'href=["\']([^"\']*/hearings/details/[^"\']+)["\']',
-            re.I,
-        )
+        # Matches e.g. "04/07/2026" or "4/7/2026" with optional time "2:00PM"
         date_re = re.compile(
-            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?',
-            re.I,
-        )
-        # No trailing \b: ILGA sometimes concatenates bill numbers in Subject Matter
-        bill_re = re.compile(r'([HS][BCR]\s*\d+)', re.I)
+            r'(\d{1,2}/\d{1,2}/\d{4})(?:\s+(\d{1,2}:\d{2}\s*[AP]M))?', re.I)
+        # Matches bill identifiers like HB1234, SB567, HR12, SR3
+        bill_re = re.compile(r'\b([HS][BCR]\d+)\b', re.I)
 
-        committee_index_urls = [
-            'https://ilga.gov/Senate/Committees',
-            'https://ilga.gov/House/Committees',
-        ]
-
-        committee_pages = []
-        seen_committee_pages = set()
-
-        for index_url in committee_index_urls:
+        for chamber in ('House', 'Senate'):
+            url = f'https://ilga.gov/{chamber}/Schedules/Legislation'
             try:
-                resp = requests.get(index_url, timeout=20, headers=headers)
+                resp = requests.get(url, timeout=20,
+                                    headers={'User-Agent': 'govbot-urbanist/1.0'})
                 resp.raise_for_status()
             except Exception as e:
-                print(f'   ⚠️  Could not fetch {index_url}: {e}')
+                print(f'   ⚠️  Could not fetch {url}: {e}')
                 continue
 
-            text = resp.text
-            for match in committee_link_re.finditer(text):
-                chamber = match.group(1)
-                code = match.group(2).strip()
-                committee_url = f'https://ilga.gov/{chamber}/Committees/Hearings/{code}'
-                if committee_url not in seen_committee_pages:
-                    seen_committee_pages.add(committee_url)
-                    committee_pages.append(committee_url)
-
-        seen_detail_urls = set()
-
-        for committee_url in committee_pages:
-            try:
-                resp = requests.get(committee_url, timeout=20, headers=headers)
-                resp.raise_for_status()
-            except Exception:
-                continue
-
-            page_text = resp.text
-            for href in detail_href_re.findall(page_text):
-                detail_url = href if href.startswith('http') else f'https://ilga.gov{href}'
-                if detail_url in seen_detail_urls:
+            # The page is an HTML table. Walk every line looking for bill IDs
+            # adjacent to a date. ILGA's table has bill number and date in the
+            # same <tr>, so we accumulate context within a small window.
+            lines = resp.text.splitlines()
+            for i, line in enumerate(lines):
+                bm = bill_re.search(line)
+                if not bm:
                     continue
-                seen_detail_urls.add(detail_url)
-
-                try:
-                    dresp = requests.get(detail_url, timeout=20, headers=headers)
-                    dresp.raise_for_status()
-                except Exception:
-                    continue
-
-                detail_text = dresp.text
-
-                dm = date_re.search(detail_text)
+                bill_id = bm.group(1).upper()
+                # Look for a date in the same line or the next 5 lines
+                window = ' '.join(lines[i:i+6])
+                dm = date_re.search(window)
                 if not dm:
                     continue
-
                 date_str = dm.group(1)
-                time_str = (dm.group(2) or '12:00 PM').replace(' ', '')
+                time_str = dm.group(2) or '12:00 PM'
                 try:
-                    dt = datetime.strptime(f'{date_str} {time_str}', '%m/%d/%Y %I:%M%p')
+                    dt = datetime.strptime(
+                        f'{date_str} {time_str.replace(" ", "")}',
+                        '%m/%d/%Y %I:%M%p'
+                    )
                 except ValueError:
                     try:
                         dt = datetime.strptime(date_str, '%m/%d/%Y')
                     except ValueError:
                         continue
-
-                for bill_match in bill_re.finditer(detail_text):
-                    bill_id = re.sub(r'\s+', '', bill_match.group(1).upper())
-                    if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
-                        bill_hearings[bill_id] = dt
+                # Keep earliest upcoming hearing per bill
+                if bill_id not in bill_hearings or dt < bill_hearings[bill_id]:
+                    bill_hearings[bill_id] = dt
 
         return bill_hearings
 
