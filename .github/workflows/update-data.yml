@@ -55,7 +55,7 @@ jobs:
           USER_ORG: ${{ secrets.USER_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python witness_slip_notifier.py --mode github-action
+          python witness_slip_notifier.py --mode github-action --data-dir .govbot/repos/il-legislation
           python3 - <<'PYEOF'
           import json, datetime, pathlib
 
