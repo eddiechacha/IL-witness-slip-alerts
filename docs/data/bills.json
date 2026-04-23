@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-22T23:51:24Z",
+  "generated_at": "2026-04-23T15:25:53Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "active",
   "session_message": "Spring session is active (Jan–May). Legislators are in Springfield — your witness slip matters now!",
@@ -106,9 +106,9 @@
       "title": "Faith-based housing and mixed-use by-right act",
       "category": "Housing",
       "stance": "Proponent",
-      "witness_slip_url": "https://ilga.gov/House/hearings/details/3111/22832/createwitnessslip",
+      "witness_slip_url": null,
       "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=5083&GAID=18&SessionID=114",
-      "committee_hearing_date": "2026-04-22T10:00:00",
+      "committee_hearing_date": null,
       "committee_name": null,
       "source": "stc_tracked"
     },
