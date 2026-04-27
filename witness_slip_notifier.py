@@ -6,12 +6,69 @@ Privacy-first: No config files, uses environment variables only.
 
 Two input modes:
   --feed <path>      Read the RSS feed produced by `govbot build` (preferred).
-                     Bills are already tagged by govbot; this script finds the
-                     ones with upcoming committee hearings, resolves witness
-                     slip URLs, and builds the activist email digest.
   --data-dir <path>  Legacy mode: parse raw OpenStates JSON directly.
   --sample           Download a small sample from GitHub for local testing.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE OVERVIEW — read this first when debugging
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DATA FLOW
+─────────
+  1. Input source  →  list[Bill]
+       --feed       : GovbotFeedParser.parse_feed()
+       --data-dir   : OpenStatesParser.parse_data_directory()
+       --sample     : fetch_sample_bills() → OpenStatesParser.parse_data_directory()
+
+  2. STC merge     →  load_stc_tracked_bills()  (Google Sheet → disk cache → fallback)
+       Any STC bill NOT already in the parsed list is appended as a "stub" Bill
+       with subjects=[category] so it always appears in the digest.
+
+  3. Hearing enrich →  OpenStatesParser.scrape_ilga_bill_hearings()  (ILGA scrape)
+       Results merged with HEARINGS_CACHE_PATH (cache/ilga_hearings.json).
+       Past hearings evicted; only future dates survive.
+       Matched bills get committee_hearing_date + slip URL updated in-place.
+
+  4. Output
+       github-action mode : writes notifications_output.{txt,html} +
+                            witness_slip_notifications.json  (read by docs/index.html)
+       local mode         : prints plain-text digest to stdout.
+
+KEY FILES
+─────────
+  witness_slip_notifier.py          — this file; all Python logic
+  docs/index.html                   — static frontend; reads witness_slip_notifications.json
+  cache/stc_tracked_bills.json      — 12-hour STC Google Sheet cache
+  cache/ilga_hearings.json          — future-only ILGA hearing cache
+  .github/workflows/update-data.yml — runs this script nightly via GitHub Actions
+
+CATEGORY SYSTEM
+───────────────
+  The UI (docs/index.html) and the digest render loop both group bills into
+  exactly these buckets (defined as CAT_ORDER in main()):
+    Housing | Biking | Safe Streets | Transit | Transportation | Other
+
+  Every Bill's display category comes from b.subjects[0].
+  _normalize_category_name() maps free-form STC sheet labels → canonical bucket.
+  govbot feed tags already use these strings and pass through unchanged.
+  *** If a bill is missing from a category section, check that b.subjects[0]
+      exactly matches (case-sensitive) one of the CAT_ORDER strings. ***
+
+COMMON DEBUG CHECKLIST
+──────────────────────
+  Bills missing from site JSON:
+    → Check witness_slip_notifications.json directly after a run.
+    → Print by_category in main() to see what subjects are on each bill.
+    → Verify b.subjects[0] exactly matches a CAT_ORDER entry (case-sensitive).
+  STC bills not loading:
+    → Delete cache/stc_tracked_bills.json and re-run to force a fresh fetch.
+    → Check STC_SHEET_CSV_URL is still valid (Google Sheets → Publish as CSV).
+  Hearing data stale:
+    → Delete cache/ilga_hearings.json to force a fresh ILGA scrape.
+  Email not sending:
+    → Verify SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD env vars.
 """
+
 
 import json
 import os
@@ -79,7 +136,15 @@ HEARINGS_CACHE_PATH = Path("cache/ilga_hearings.json")
 
 
 def _normalize_bill_id(raw: str) -> Optional[str]:
-    """Normalize a raw bill string like 'HB 2454' or 'sb4061' -> 'HB2454'."""
+    """Normalize a raw bill identifier to canonical form like 'HB2454'.
+
+    Strips spaces, punctuation, and lowercasing. Validates against the
+    Illinois bill prefix patterns (HB, SB, HR, SR, HJR, SJR, HJRCA, SJRCA).
+
+    Args:   raw — any variant, e.g. 'HB 2454', 'sb4061', 'SB 4,061'
+    Returns: 'HB2454' style string, or None if unparseable.
+    Dependencies: re (stdlib only)
+    """
     if not raw:
         return None
     s = re.sub(r"[^A-Za-z0-9]", "", str(raw).strip().upper())
@@ -88,7 +153,22 @@ def _normalize_bill_id(raw: str) -> Optional[str]:
 
 
 def _normalize_category_name(raw: str) -> str:
-    """Map free-form STC category labels into canonical buckets used by the UI."""
+    """Map a free-form STC sheet category label to a canonical CAT_ORDER bucket.
+
+    CRITICAL: Every bill's display category is b.subjects[0]. The render loop
+    in main() groups bills with  `for cat in CAT_ORDER` using exact string
+    matching. If subjects[0] doesn't match a CAT_ORDER entry the bill is
+    silently placed in 'Other'. This function is the single place that prevents
+    that by normalising Google Sheet values and govbot tags to the exact strings
+    CAT_ORDER expects.
+
+    Matching is case-insensitive substring; more-specific rules come first
+    ('transit' before 'transport') to avoid wrong-bucket hits.
+
+    If you add a new CAT_ORDER bucket, add a matching branch here.
+    Dependencies: none (stdlib str methods only)
+    """
+
     if not raw:
         return "Other"
     s = str(raw).strip()
@@ -107,7 +187,21 @@ def _normalize_category_name(raw: str) -> str:
 
 
 def _fetch_stc_sheet() -> dict:
-    """Download the STC Google Sheet as CSV and return a bill_id -> info dict."""
+    """Download the STC Google Sheet as CSV and return a bill_id → info dict.
+
+    Fetches STC_SHEET_CSV_URL, parses as CSV, normalizes all column headers to
+    lowercase so header renames on the sheet don't break parsing. Tries several
+    common column name variants for bill ID, category, description, and stance.
+
+    Returns:  dict  { 'HB2454': ('Biking', 'Description...', 'Proponent'), ... }
+    Raises:   requests.HTTPError if the endpoint returns non-200.
+              ValueError if CSV parsed to zero usable rows.
+    Dependencies: requests, csv, io, _normalize_bill_id, _normalize_category_name
+
+    Debug tip: if bills are missing, print `rows` here to see what the sheet
+    actually exports, then adjust the column-name fallback lists below.
+    """
+
     print("🌐 Fetching STC tracked bills from Google Sheet...")
     resp = requests.get(STC_SHEET_CSV_URL, timeout=30)
     resp.raise_for_status()
@@ -137,11 +231,24 @@ def _fetch_stc_sheet() -> dict:
 
 
 def load_stc_tracked_bills(force_refresh: bool = False) -> dict:
-    """Return the STC tracked-bills dict, using a 12-hour disk cache.
+    """Return the STC tracked-bills dict using a 12-hour disk cache.
 
-    Falls back to the hard-coded STC_TRACKED_BILLS constant if the live
-    fetch fails and there is no usable cache.
+    Resolution order:
+      1. Fresh disk cache  (cache/stc_tracked_bills.json, age < STC_CACHE_TTL)
+      2. Live Google Sheet fetch via _fetch_stc_sheet() → writes new cache
+      3. Stale disk cache  (any age) if live fetch fails
+      4. Hard-coded STC_TRACKED_BILLS constant as last resort
+
+    Cache format: { "fetched_at": <unix ts>, "bills": { "HB2454": [...], ... } }
+
+    Args:  force_refresh — skip cache and always hit the live sheet
+    Returns: dict mapping normalized bill IDs → (category, description, stance)
+    Dependencies: json, time, Path, _fetch_stc_sheet, STC_CACHE_PATH,
+                  STC_CACHE_TTL, STC_TRACKED_BILLS
+
+    Debug: delete cache/stc_tracked_bills.json to force a fresh fetch.
     """
+
     now = int(time.time())
 
     # Try cache first
@@ -252,6 +359,16 @@ class Bill:
         return f"https://ilga.gov/{chamber_path}/hearings"
 
     def get_bill_status_url(self) -> str:
+        """Construct the canonical ILGA BillStatus page URL for this bill.
+
+        GAID=18 = 104th General Assembly. SessionID=114 = current regular session.
+        Update both when the GA changes.
+
+        Used by: render_bill() as 'ILGA page' target, JSON output 'ilga_url' field,
+                 get_witness_slip_url() fallback, STC stub construction in main().
+        Dependencies: self.chamber, self.bill_number
+        """
+
         doc_type = "HB" if self.chamber == Chamber.HOUSE else "SB"
         bill_num = self.bill_number.replace("HB", "").replace("SB", "").strip()
         return f"https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID={doc_type}&DocNum={bill_num}&GAID=18&SessionID=114"
@@ -625,21 +742,28 @@ class OpenStatesParser:
 
     @staticmethod
     def scrape_ilga_bill_hearings() -> dict:
-        """Scrape upcoming bill hearings from ILGA committee hearing pages.
+        """Scrape upcoming IL committee hearings from ILGA.gov.
 
-        Strategy:
-          1. Fetch /Senate/Committees and /House/Committees index pages.
-          2. Extract committee IDs from Committees/Members/{id} href patterns.
-          3. For each committee fetch /Senate/Committees/Hearings/{id} and
-             scrape hearings/details/{cid}/{hid} links.
-          4. Supplement with /API/Hearings/GetHearingsListByRange (today+60d)
-             in case the index pages miss any hearings.
-          5. Fetch every detail page, parse date and bill numbers, build
-             the witness slip URL as detail_url + /createwitnessslip.
+        Network-intensive (~50-200 HTTP requests). Results cached to
+        HEARINGS_CACHE_PATH by main() so it only runs once per Actions run.
 
-        Returns:
-          dict mapping normalized bill id -> (hearing datetime, slip_url)
+        5-step strategy:
+          1. GET Senate/House committee index pages.
+          2. Extract committee IDs from 'Committees/Members/{id}' hrefs.
+          3. Per-committee: GET Committees/Hearings/{id}, extract detail hrefs.
+          4. Supplement from JSON API: /API/Hearings/GetHearingsListByRange
+          5. Fetch each detail page, parse date + bill numbers, build slip URL
+             as detail_url + '/createwitnessslip'.
+
+        Returns: dict { 'HB2454': (hearing_datetime, slip_url), ... }
+                 Only the earliest future hearing per bill is kept.
+        Dependencies: requests, re, datetime, timedelta
+
+        Debug: if no hearings found, check that committee index URLs still use
+        /Senate/Committees and /House/Committees. If date parsing fails, check
+        the us_m regex pattern matches current ILGA HTML date format (M/D/YYYY H:MM AM).
         """
+
         import re
 
         bill_hearings: dict = {}
@@ -1436,9 +1560,20 @@ def main():
     from collections import defaultdict
     by_category = defaultdict(list)
     for b in actionable:
-        cat = b.subjects[0] if b.subjects else 'Other'
+        # Normalize the raw subject through _normalize_category_name so that
+        # govbot tags with slightly different wording still land in the correct
+        # CAT_ORDER bucket. Without this, e.g. "Bicycle" never matches "Biking"
+        # and those bills silently disappear from all named sections.
+        raw_cat = b.subjects[0] if b.subjects else 'Other'
+        cat = _normalize_category_name(raw_cat)
+        # Write the normalized category back so the render loop and JSON output
+        # both see the canonical bucket name (e.g. "Biking" not "Bicycle").
+        if b.subjects:
+            b.subjects[0] = cat
         by_category[cat].append(b)
 
+    # CAT_ORDER controls the section sequence in the digest and on the site.
+    # Add new categories here AND add a matching branch to _normalize_category_name().
     CAT_ORDER = ['Housing', 'Biking', 'Safe Streets', 'Transit', 'Transportation', 'Other']
     STANCE_EMOJI = {'Proponent': '👍', 'Opponent': '🚫'}
 
