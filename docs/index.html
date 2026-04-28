@@ -501,8 +501,8 @@ footer a:hover{color:var(--primary)}
 const DATA_URL = './data/bills.json';
 const COOKIE_KEY = 'il_urbanist_tracked';
 const NOTIF_COOKIE = 'il_urbanist_notif_seen';
-const CAT_ORDER = ['Housing','Biking','Safe Streets','Transit','Other'];
-const CAT_EMOJI = {Housing:'🏘️',Biking:'🚲','Safe Streets':'🚦',Transit:'🚇',Other:'📋'};
+const CAT_ORDER = ['Housing','Biking','Safe Streets','Transit','Transportation','Other'];
+const CAT_EMOJI = {Housing:'🏘️',Biking:'🚲','Safe Streets':'🚦',Transit:'🚇',Transportation:'🚗',Other:'📋'};
 
 // ── Cookie helpers (no localStorage — sandboxed iframes block it) ──
 function getCookie(k){
@@ -686,11 +686,11 @@ function renderBillCard(b){
       <div class="bill-title">${b.title||'No title available'}</div>
       ${hearingHtml}
       <div class="bill-actions">
-        <a class="${slipBtnClass}" href="${slipHref}" target="_blank" rel="noopener noreferrer">
+        ${hasHearing ? `<a class="${slipBtnClass}" href="${slipHref}" target="_blank" rel="noopener noreferrer">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           ${slipLabel}
-        </a>
-        <a class="btn-ilga" href="${b.witness_slip_url||slipUrl(b.bill_number)}" target="_blank" rel="noopener noreferrer">
+        </a>` : ''}
+        <a class="btn-ilga" href="${b.ilga_url||slipUrl(b.bill_number)}" target="_blank" rel="noopener noreferrer">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           ILGA page
         </a>
