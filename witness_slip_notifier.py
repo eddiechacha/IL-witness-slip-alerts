@@ -1316,6 +1316,85 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-
         return output
 
 
+def generate_rss_feed(bills: list, output_path) -> None:
+    """Write an RSS 2.0 feed of all tracked bills, hearings-first."""
+    from pathlib import Path
+    from xml.sax.saxutils import escape
+
+    BASE_URL = "https://strongtownschicago.github.io/IL-witness-slip-alerts/"
+    now_rfc  = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+    def rfc_date(dt):
+        return dt.strftime("%a, %d %b %Y %H:%M:%S +0000") if dt else ""
+
+    with_hearing    = sorted([b for b in bills if b.committee_hearing_date],
+                              key=lambda b: b.committee_hearing_date)
+    without_hearing = sorted([b for b in bills if not b.committee_hearing_date],
+                              key=lambda b: b.bill_number)
+    ordered = with_hearing + without_hearing
+
+    items = []
+    for b in ordered:
+        cat      = b.subjects[0] if b.subjects else "Other"
+        stance   = getattr(b, "stance", "Proponent")
+        bill_url = b.get_bill_status_url() or BASE_URL
+        slip_url = b.ilga_url if b.committee_hearing_date else None
+
+        if b.committee_hearing_date:
+            hearing_str = b.committee_hearing_date.strftime("%B %-d, %Y at %-I:%M %p")
+            cmt_str     = f" \u2014 {b.committee_name}" if b.committee_name else ""
+            desc = (
+                f"Hearing scheduled: {hearing_str}{cmt_str}. "
+                f"Stance: {stance}. Category: {cat}. "
+                + (f"File your witness slip: {slip_url}" if slip_url else "")
+            )
+            pub_tag = f"\n    <pubDate>{rfc_date(b.committee_hearing_date)}</pubDate>"
+        else:
+            desc    = f"On the watchlist. Stance: {stance}. Category: {cat}. No hearing scheduled yet."
+            pub_tag = ""
+
+        guid  = escape(f"{bill_url}#{b.bill_number}")
+        title = escape(b.title or "No title available")
+        item  = (
+            "  <item>\n"
+            f"    <title>{escape(b.bill_number)}: {title}</title>\n"
+            f"    <link>{escape(bill_url)}</link>\n"
+            f"    <description>{escape(desc)}</description>\n"
+            f"    <category>{escape(cat)}</category>{pub_tag}\n"
+            f"    <guid isPermaLink=\"true\">{guid}</guid>\n"
+            "  </item>"
+        )
+        items.append(item)
+
+    hearing_count = len(with_hearing)
+    if hearing_count:
+        channel_desc = (
+            f"{hearing_count} bill{'s' if hearing_count != 1 else ''} "
+            "with upcoming hearings. File your witness slip now!"
+        )
+    else:
+        channel_desc = "Tracking urbanist bills in the Illinois General Assembly."
+
+    feed = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        '<channel>\n'
+        '  <title>IL Witness Slip Tracker \u2014 Strong Towns Chicago</title>\n'
+        f'  <link>{BASE_URL}</link>\n'
+        f'  <atom:link href="{BASE_URL}feed.xml" rel="self" type="application/rss+xml"/>\n'
+        f'  <description>{escape(channel_desc)}</description>\n'
+        f'  <lastBuildDate>{now_rfc}</lastBuildDate>\n'
+        '  <language>en-us</language>\n'
+        '  <ttl>360</ttl>\n'
+        + "\n".join(items) + "\n"
+        '</channel>\n'
+        '</rss>\n'
+    )
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_path).write_text(feed, encoding="utf-8")
+    print(f"\u2705 RSS feed written: {output_path} ({len(ordered)} items, {hearing_count} with hearings)")
+
 def main():
     parser = argparse.ArgumentParser(
         description="IL Urbanist Witness Slip Notifier"
@@ -1711,6 +1790,7 @@ def main():
         Path('witness_slip_notifications.json').write_text(
             json.dumps(json_output, indent=2, ensure_ascii=False)
         )
+        generate_rss_feed(actionable, Path('docs/feed.xml'))
         print("✅ Output files written")
     else:
         print(plain)
