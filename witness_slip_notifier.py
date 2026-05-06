@@ -1321,7 +1321,7 @@ def generate_rss_feed(bills: list, output_path) -> None:
     from pathlib import Path
     from xml.sax.saxutils import escape
 
-    BASE_URL = "https://strongtownschicago.github.io/IL-witness-slip-alerts/"
+    BASE_URL = "https://eddiechacha.github.io/IL-witness-slip-alerts/"
     now_rfc  = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
 
     def rfc_date(dt):
