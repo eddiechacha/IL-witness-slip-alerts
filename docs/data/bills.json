@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-06T23:54:33Z",
+  "generated_at": "2026-05-07T15:36:38Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "active",
   "session_message": "Spring session is active (Jan–May). Legislators are in Springfield — your witness slip matters now!",
@@ -226,9 +226,9 @@
       "title": "Removes \"safety zones\" eligibility when the speed limit is decreased by ordinance from 30 to 20 mph",
       "category": "Transportation",
       "stance": "Opponent",
-      "witness_slip_url": "https://ilga.gov/Senate/hearings/details/3072/22962/createwitnessslip",
+      "witness_slip_url": null,
       "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=5081&GAID=18&SessionID=114",
-      "committee_hearing_date": "2026-05-06T13:30:00",
+      "committee_hearing_date": null,
       "committee_name": null,
       "source": "stc_tracked"
     }

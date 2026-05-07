@@ -4,18 +4,10 @@
   <title>IL Witness Slip Tracker — Strong Towns Chicago</title>
   <link>https://eddiechacha.github.io/IL-witness-slip-alerts/</link>
   <atom:link href="https://eddiechacha.github.io/IL-witness-slip-alerts/feed.xml" rel="self" type="application/rss+xml"/>
-  <description>1 bill with upcoming hearings. File your witness slip now!</description>
-  <lastBuildDate>Wed, 06 May 2026 23:54:33 +0000</lastBuildDate>
+  <description>Tracking urbanist bills in the Illinois General Assembly.</description>
+  <lastBuildDate>Thu, 07 May 2026 15:36:38 +0000</lastBuildDate>
   <language>en-us</language>
   <ttl>360</ttl>
-  <item>
-    <title>HB5081: Removes "safety zones" eligibility when the speed limit is decreased by ordinance from 30 to 20 mph</title>
-    <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114</link>
-    <description>Hearing scheduled: May 6, 2026 at 1:30 PM. Stance: Opponent. Category: Transportation. File your witness slip: https://ilga.gov/Senate/hearings/details/3072/22962/createwitnessslip</description>
-    <category>Transportation</category>
-    <pubDate>Wed, 06 May 2026 13:30:00 +0000</pubDate>
-    <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114#HB5081</guid>
-  </item>
   <item>
     <title>HB4281: Allows speed cameras in cities with 25,000+ population in Cook County</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4281&amp;GAID=18&amp;SessionID=114</link>
@@ -57,6 +49,13 @@
     <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
     <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4925&amp;GAID=18&amp;SessionID=114#HB4925</guid>
+  </item>
+  <item>
+    <title>HB5081: Removes "safety zones" eligibility when the speed limit is decreased by ordinance from 30 to 20 mph</title>
+    <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114</link>
+    <description>On the watchlist. Stance: Opponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
+    <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114#HB5081</guid>
   </item>
   <item>
     <title>HB5083: Faith-based housing and mixed-use by-right act</title>
