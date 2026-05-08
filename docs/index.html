@@ -362,6 +362,86 @@ footer a:hover{color:var(--primary)}
   .search-wrap{min-width:0}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ── Embed / compact modes ─────────────────────────────────────── */
+/* ?embed=1  → hides full-page chrome (header, footer, dev, status)  */
+/* ?compact=1 → embed=1 + also hides hero intro and how-to           */
+
+html[data-embed="1"],
+html[data-compact="1"] {
+  scroll-padding-top: .5rem;
+}
+html[data-embed="1"] body,
+html[data-compact="1"] body {
+  background: transparent;
+  min-height: 0;
+}
+/* hide full-page chrome */
+html[data-embed="1"] header.site-header,
+html[data-compact="1"] header.site-header,
+html[data-embed="1"] #devPanel,
+html[data-compact="1"] #devPanel,
+html[data-embed="1"] footer.container,
+html[data-compact="1"] footer.container,
+html[data-embed="1"] .status-bar,
+html[data-compact="1"] .status-bar {
+  display: none !important;
+}
+/* tighter container */
+html[data-embed="1"] .container,
+html[data-compact="1"] .container {
+  max-width: 1040px;
+  padding: 0 .75rem;
+}
+html[data-embed="1"] main,
+html[data-compact="1"] main {
+  padding-top: .5rem;
+}
+/* embed mode: keep hero but shrink it */
+html[data-embed="1"] .hero {
+  padding: .5rem 0 1rem;
+  margin-bottom: .25rem;
+  border-bottom: 1px solid var(--divider);
+}
+html[data-embed="1"] .hero-kicker,
+html[data-embed="1"] .hero-attribution {
+  display: none !important;
+}
+html[data-embed="1"] .hero h1 {
+  font-size: clamp(1.3rem, 3vw, 1.9rem);
+  margin-bottom: .3rem;
+}
+html[data-embed="1"] .hero p {
+  font-size: .9rem;
+  max-width: none;
+}
+/* compact mode: hide hero + how-to entirely */
+html[data-compact="1"] .hero,
+html[data-compact="1"] #howTo {
+  display: none !important;
+}
+/* tighten spacing in both modes */
+html[data-embed="1"] .banner,
+html[data-compact="1"] .banner { margin-bottom: .75rem; }
+html[data-embed="1"] .session-banner,
+html[data-compact="1"] .session-banner { margin-bottom: .75rem; }
+html[data-embed="1"] .toolbar,
+html[data-compact="1"] .toolbar { margin-bottom: .85rem; }
+html[data-embed="1"] .cat-filters,
+html[data-compact="1"] .cat-filters { margin-bottom: .85rem; }
+html[data-embed="1"] .bill-list,
+html[data-compact="1"] .bill-list { margin-bottom: 1rem; }
+html[data-embed="1"] #toast,
+html[data-compact="1"] #toast { bottom: .6rem; }
+/* compact: add a small top pad so content isn't flush */
+html[data-compact="1"] main { padding-top: .75rem; }
+@media (max-width: 700px) {
+  html[data-embed="1"] .container,
+  html[data-compact="1"] .container { padding: 0 .5rem; }
+  html[data-embed="1"] .hero { padding: .35rem 0 .85rem; }
+  html[data-embed="1"] .bill-card,
+  html[data-compact="1"] .bill-card { padding: .8rem .85rem; }
+}
 </style>
 </head>
 <body>
@@ -508,6 +588,13 @@ footer a:hover{color:var(--primary)}
 const DATA_URL = './data/bills.json';
 const COOKIE_KEY = 'il_urbanist_tracked';
 const NOTIF_COOKIE = 'il_urbanist_notif_seen';
+const PAGE_PARAMS = new URLSearchParams(window.location.search);
+const EMBED_MODE = PAGE_PARAMS.get('embed') === '1';
+const COMPACT_MODE = PAGE_PARAMS.get('compact') === '1';
+if(EMBED_MODE) document.documentElement.setAttribute('data-embed','1');
+if(COMPACT_MODE) document.documentElement.setAttribute('data-compact','1');
+
+
 const CAT_ORDER = ['Housing','Transportation','Other'];
 const CAT_EMOJI = {Housing:'🏘️',Transportation:'🚗',Other:'📋'};
 
@@ -709,6 +796,26 @@ function renderBillCard(b){
   </article>`;
 }
 
+function notifyParentHeight(){
+  if(!EMBED_MODE || window.parent === window) return;
+  const height = Math.max(
+    document.body ? document.body.scrollHeight : 0,
+    document.documentElement ? document.documentElement.scrollHeight : 0,
+    document.documentElement ? document.documentElement.offsetHeight : 0
+  );
+  window.parent.postMessage({type:'ilwst:height', height}, '*');
+}
+
+function notifyParentHeight(){
+  if(!EMBED_MODE || window.parent === window) return;
+  const height = Math.max(
+    document.body ? document.body.scrollHeight : 0,
+    document.documentElement ? document.documentElement.scrollHeight : 0,
+    document.documentElement ? document.documentElement.offsetHeight : 0
+  );
+  window.parent.postMessage({type:'ilwst:height', height}, '*');
+}
+
 function renderAll(){
   document.getElementById('loadingState').style.display = 'none';
   const sections = document.getElementById('billSections');
@@ -814,6 +921,8 @@ function renderAll(){
       addTracked(btn.dataset.addpersonal);
     });
   });
+
+  if(EMBED_MODE || COMPACT_MODE) requestAnimationFrame(notifyParentHeight);
 }
 
 // ── Personal list ─────────────────────────────────────────────────
@@ -959,6 +1068,24 @@ function clearTestBills(){
 document.getElementById('devTestNotif').addEventListener('click', fireTestNotification);
 document.getElementById('devInjectBills').addEventListener('click', injectTestBills);
 document.getElementById('devClearBills').addEventListener('click', clearTestBills);
+
+if(EMBED_MODE || COMPACT_MODE){
+  window.addEventListener('load',()=>setTimeout(notifyParentHeight,80));
+  window.addEventListener('resize',()=>requestAnimationFrame(notifyParentHeight));
+  if('ResizeObserver' in window && document.body){
+    const embedResizeObserver = new ResizeObserver(()=>requestAnimationFrame(notifyParentHeight));
+    embedResizeObserver.observe(document.body);
+  }
+}
+
+if(EMBED_MODE || COMPACT_MODE){
+  window.addEventListener('load',()=>setTimeout(notifyParentHeight,80));
+  window.addEventListener('resize',()=>requestAnimationFrame(notifyParentHeight));
+  if('ResizeObserver' in window && document.body){
+    const embedResizeObserver = new ResizeObserver(()=>requestAnimationFrame(notifyParentHeight));
+    embedResizeObserver.observe(document.body);
+  }
+}
 
 // ── Boot ──────────────────────────────────────────────────────────
 loadData();
