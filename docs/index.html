@@ -442,6 +442,114 @@ html[data-compact="1"] main { padding-top: .75rem; }
   html[data-embed="1"] .bill-card,
   html[data-compact="1"] .bill-card { padding: .8rem .85rem; }
 }
+
+/* ── STC brand theme (?stc=1 or ?compact=1 with STC host) ────────────
+   Orange #ff9f28 as primary, deep navy #0c1f37 as surface/text anchor.
+   Apply on top of the existing light-mode tokens.
+   ---------------------------------------------------------------------- */
+html[data-stc="1"] {
+  --primary:        #e8870a;
+  --primary-hover:  #c96e00;
+  --primary-hl:     #fff0d6;
+  --bg:             #f8f7f4;
+  --surface:        #ffffff;
+  --surface-2:      #f4f2ee;
+  --surface-offset: #ede9e1;
+  --border:         #d4cfc5;
+  --divider:        #e3dfd7;
+  --text:           #0c1f37;
+  --text-muted:     #3a5068;
+  --text-faint:     #7a96ad;
+  --success:        #1a6b3a;
+  --success-hl:     #d0ecdc;
+  --warning:        #b06010;
+  --warning-hl:     #fdebd0;
+  --error:          #8b1a4a;
+  --error-hl:       #f0d6e4;
+}
+/* accent buttons use STC orange */
+html[data-stc="1"] .btn-slip {
+  background: #ff9f28;
+  color: #0c1f37;
+}
+html[data-stc="1"] .btn-slip:hover {
+  background: #e8870a;
+  color: #0c1f37;
+}
+html[data-stc="1"] .btn-add {
+  background: #ff9f28;
+  color: #0c1f37;
+}
+html[data-stc="1"] .btn-add:hover { background: #e8870a; }
+html[data-stc="1"] .cat-chip.active {
+  background: #ff9f28;
+  border-color: #ff9f28;
+  color: #0c1f37;
+}
+html[data-stc="1"] .cat-chip:hover {
+  border-color: #ff9f28;
+  color: #e8870a;
+}
+html[data-stc="1"] .section-head .pill {
+  background: #fff0d6;
+  color: #c96e00;
+}
+html[data-stc="1"] .btn-notify {
+  background: #ff9f28;
+  color: #0c1f37;
+}
+html[data-stc="1"] .btn-notify:hover { background: #e8870a; }
+html[data-stc="1"] .btn-notify.granted { background: var(--success); color: #fff; }
+html[data-stc="1"] .logo { color: #0c1f37; }
+html[data-stc="1"] :focus-visible { outline-color: #ff9f28; }
+html[data-stc="1"] .search-input:focus {
+  border-color: #ff9f28;
+  box-shadow: 0 0 0 3px #fff0d6;
+}
+html[data-stc="1"] .add-input:focus {
+  border-color: #ff9f28;
+  box-shadow: 0 0 0 3px #fff0d6;
+}
+html[data-stc="1"] .bill-card.urgent {
+  border-color: color-mix(in oklch, var(--success) 40%, transparent);
+}
+html[data-stc="1"] .bill-card.personal {
+  border-color: color-mix(in oklch, #ff9f28 35%, transparent);
+  background: color-mix(in oklch, #fff0d6 50%, var(--surface));
+}
+html[data-stc="1"] .hero-kicker { color: #ff9f28; }
+html[data-stc="1"] a { color: #c96e00; }
+html[data-stc="1"] a:hover { color: #e8870a; }
+
+/* ── Two-column bill grid on wider embeds (≥700px) ───────────────────
+   Works in both embed+compact modes. Cards keep their full detail.
+   ---------------------------------------------------------------------- */
+@media (min-width: 700px) {
+  html[data-compact="1"] .bill-list,
+  html[data-embed="1"] .bill-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .65rem;
+    align-items: start;
+  }
+  /* Urgent (hearing) section stays single-col so it reads as priority */
+  html[data-compact="1"] .bill-list:has(.bill-card.urgent),
+  html[data-embed="1"] .bill-list:has(.bill-card.urgent) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (min-width: 1000px) {
+  html[data-compact="1"] .bill-list,
+  html[data-embed="1"] .bill-list {
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+  }
+}
+/* cards in grid: make sure they fill their column */
+html[data-compact="1"] .bill-card,
+html[data-embed="1"] .bill-card {
+  align-self: stretch;
+}
 </style>
 </head>
 <body>
@@ -591,8 +699,12 @@ const NOTIF_COOKIE = 'il_urbanist_notif_seen';
 const PAGE_PARAMS = new URLSearchParams(window.location.search);
 const EMBED_MODE = PAGE_PARAMS.get('embed') === '1';
 const COMPACT_MODE = PAGE_PARAMS.get('compact') === '1';
+const STC_MODE = PAGE_PARAMS.get('stc') === '1';
 if(EMBED_MODE) document.documentElement.setAttribute('data-embed','1');
 if(COMPACT_MODE) document.documentElement.setAttribute('data-compact','1');
+if(STC_MODE) document.documentElement.setAttribute('data-stc','1');
+// ?compact=1 implies ?stc=1 by default for STC embed convenience
+if(COMPACT_MODE && !STC_MODE) document.documentElement.setAttribute('data-stc','1');
 
 
 const CAT_ORDER = ['Housing','Transportation','Other'];
