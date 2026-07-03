@@ -5,9 +5,23 @@
   <link>https://eddiechacha.github.io/IL-witness-slip-alerts/</link>
   <atom:link href="https://eddiechacha.github.io/IL-witness-slip-alerts/feed.xml" rel="self" type="application/rss+xml"/>
   <description>Tracking urbanist bills in the Illinois General Assembly.</description>
-  <lastBuildDate>Thu, 02 Jul 2026 23:58:11 +0000</lastBuildDate>
+  <lastBuildDate>Fri, 03 Jul 2026 15:07:20 +0000</lastBuildDate>
   <language>en-us</language>
   <ttl>360</ttl>
+  <item>
+    <title>HB2454: Adds bicycles as intended users of roadways</title>
+    <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2454&amp;GAID=18&amp;SessionID=114</link>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
+    <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2454&amp;GAID=18&amp;SessionID=114#HB2454</guid>
+  </item>
+  <item>
+    <title>HB2934: Lowers max urban speed limit from 30 to 20 mph on roadways and from 15 to 10 mph in alleyways (file as a Proponent for BOTH Original Bill and HCA 1)</title>
+    <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2934&amp;GAID=18&amp;SessionID=114</link>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
+    <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2934&amp;GAID=18&amp;SessionID=114#HB2934</guid>
+  </item>
   <item>
     <title>HB4281: Allows speed cameras in cities with 25,000+ population in Cook County</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4281&amp;GAID=18&amp;SessionID=114</link>

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T23:58:11Z",
+  "generated_at": "2026-07-03T15:07:20Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
   "session_status": "recess",
   "session_message": "Legislature is in summer recess. Next opportunity: veto session in November. You can still review bills and prepare your slip.",
@@ -149,6 +149,18 @@
       "source": "stc_tracked"
     },
     {
+      "bill_number": "HB2454",
+      "chamber": "House",
+      "title": "Adds bicycles as intended users of roadways",
+      "category": "Transportation",
+      "stance": "Proponent",
+      "witness_slip_url": null,
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=2454&GAID=18&SessionID=114",
+      "committee_hearing_date": null,
+      "committee_name": null,
+      "source": "stc_tracked"
+    },
+    {
       "bill_number": "HB4660",
       "chamber": "House",
       "title": "Legalizes the Idaho Stop for bicycles",
@@ -168,6 +180,18 @@
       "stance": "Proponent",
       "witness_slip_url": null,
       "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=4925&GAID=18&SessionID=114",
+      "committee_hearing_date": null,
+      "committee_name": null,
+      "source": "stc_tracked"
+    },
+    {
+      "bill_number": "HB2934",
+      "chamber": "House",
+      "title": "Lowers max urban speed limit from 30 to 20 mph on roadways and from 15 to 10 mph in alleyways (file as a Proponent for BOTH Original Bill and HCA 1)",
+      "category": "Transportation",
+      "stance": "Proponent",
+      "witness_slip_url": null,
+      "ilga_url": "https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&DocNum=2934&GAID=18&SessionID=114",
       "committee_hearing_date": null,
       "committee_name": null,
       "source": "stc_tracked"
