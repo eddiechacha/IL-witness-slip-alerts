@@ -5,49 +5,49 @@
   <link>https://eddiechacha.github.io/IL-witness-slip-alerts/</link>
   <atom:link href="https://eddiechacha.github.io/IL-witness-slip-alerts/feed.xml" rel="self" type="application/rss+xml"/>
   <description>Tracking urbanist bills in the Illinois General Assembly.</description>
-  <lastBuildDate>Thu, 09 Jul 2026 15:54:44 +0000</lastBuildDate>
+  <lastBuildDate>Thu, 09 Jul 2026 23:59:12 +0000</lastBuildDate>
   <language>en-us</language>
   <ttl>360</ttl>
   <item>
     <title>HB2454: Adds bicycles as intended users of roadways</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2454&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Biking. No hearing scheduled yet.</description>
-    <category>Biking</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2454&amp;GAID=18&amp;SessionID=114#HB2454</guid>
   </item>
   <item>
-    <title>HB2934: Lowers urban speed limit 30→20 mph / alley 15→10 mph</title>
+    <title>HB2934: Lowers max urban speed limit from 30 to 20 mph on roadways and from 15 to 10 mph in alleyways (file as a Proponent for BOTH Original Bill and HCA 1)</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2934&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Safe Streets. No hearing scheduled yet.</description>
-    <category>Safe Streets</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=2934&amp;GAID=18&amp;SessionID=114#HB2934</guid>
   </item>
   <item>
-    <title>HB4281: Speed cameras in Cook County cities 25k+ population</title>
+    <title>HB4281: Allows speed cameras in cities with 25,000+ population in Cook County</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4281&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Safe Streets. No hearing scheduled yet.</description>
-    <category>Safe Streets</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4281&amp;GAID=18&amp;SessionID=114#HB4281</guid>
   </item>
   <item>
-    <title>HB4333: Lowers DUI BAC threshold 0.08% → 0.05%</title>
+    <title>HB4333: Lowers BAC threshold for DUI from 0.08% to 0.05% (NHTSA recommendation)</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4333&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Safe Streets. No hearing scheduled yet.</description>
-    <category>Safe Streets</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4333&amp;GAID=18&amp;SessionID=114#HB4333</guid>
   </item>
   <item>
-    <title>HB4660: Idaho Stop — legalizes yield-at-stop for cyclists</title>
+    <title>HB4660: Legalizes the Idaho Stop for bicycles</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4660&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Biking. No hearing scheduled yet.</description>
-    <category>Biking</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4660&amp;GAID=18&amp;SessionID=114#HB4660</guid>
   </item>
   <item>
-    <title>HB4759: Green Light for Buses — transit signal priority</title>
+    <title>HB4759: Green Light for Buses â enables more transit signal priority</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4759&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Transit. No hearing scheduled yet.</description>
-    <category>Transit</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4759&amp;GAID=18&amp;SessionID=114#HB4759</guid>
   </item>
   <item>
@@ -58,21 +58,21 @@
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4835&amp;GAID=18&amp;SessionID=114#HB4835</guid>
   </item>
   <item>
-    <title>HB4925: Class 3 e-bike: 18+ to carry passenger under 18</title>
+    <title>HB4925: Operator of a Class 3 e-bike must be at least 18 to carry a passenger under 18</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4925&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Biking. No hearing scheduled yet.</description>
-    <category>Biking</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=4925&amp;GAID=18&amp;SessionID=114#HB4925</guid>
   </item>
   <item>
-    <title>HB5081: REMOVES safety zones when speed limit lowered to 20 mph</title>
+    <title>HB5081: Removes "safety zones" eligibility when the speed limit is decreased by ordinance from 30 to 20 mph</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Opponent. Category: Safe Streets. No hearing scheduled yet.</description>
-    <category>Safe Streets</category>
+    <description>On the watchlist. Stance: Opponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5081&amp;GAID=18&amp;SessionID=114#HB5081</guid>
   </item>
   <item>
-    <title>HB5083: YIGBY — Faith-based housing &amp; mixed-use by-right</title>
+    <title>HB5083: Faith-based housing and mixed-use by-right act</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5083&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
@@ -86,14 +86,14 @@
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5198&amp;GAID=18&amp;SessionID=114#HB5198</guid>
   </item>
   <item>
-    <title>HB5626: BUILD Act (Omnibus) — House omnibus housing bill</title>
+    <title>HB5626: House omnibus bill containing all related Senate provisions</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5626&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=HB&amp;DocNum=5626&amp;GAID=18&amp;SessionID=114#HB5626</guid>
   </item>
   <item>
-    <title>SB3187: YIGBY — Faith-based housing &amp; mixed-use by-right</title>
+    <title>SB3187: Faith-based housing and mixed-use by-right act</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=3187&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
@@ -102,54 +102,54 @@
   <item>
     <title>SB3478: Bike grid enabling legislation</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=3478&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Biking. No hearing scheduled yet.</description>
-    <category>Biking</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=3478&amp;GAID=18&amp;SessionID=114#SB3478</guid>
   </item>
   <item>
-    <title>SB3627: Quick Build — IDOT must accept quick-build safety infra</title>
+    <title>SB3627: Quick Build â requires IDOT to accept quick-build safety infrastructure on state roads (file as a Proponent for SB 3627 - SCA 1)</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=3627&amp;GAID=18&amp;SessionID=114</link>
-    <description>On the watchlist. Stance: Proponent. Category: Safe Streets. No hearing scheduled yet.</description>
-    <category>Safe Streets</category>
+    <description>On the watchlist. Stance: Proponent. Category: Transportation. No hearing scheduled yet.</description>
+    <category>Transportation</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=3627&amp;GAID=18&amp;SessionID=114#SB3627</guid>
   </item>
   <item>
-    <title>SB4060: BUILD Act — 2–8 units by right (missing middle)</title>
+    <title>SB4060: Expanding housing options for Illinois' middle class â allows 2â8 units by right depending on lot size</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4060&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4060&amp;GAID=18&amp;SessionID=114#SB4060</guid>
   </item>
   <item>
-    <title>SB4061: BUILD Act — Single stair reform</title>
+    <title>SB4061: Single stair reform</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4061&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4061&amp;GAID=18&amp;SessionID=114#SB4061</guid>
   </item>
   <item>
-    <title>SB4062: BUILD Act — Impact fee modernization</title>
+    <title>SB4062: Impact fee modernization</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4062&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4062&amp;GAID=18&amp;SessionID=114#SB4062</guid>
   </item>
   <item>
-    <title>SB4063: BUILD Act — Third-party review for housing permits</title>
+    <title>SB4063: Third-party review for housing permits</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4063&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4063&amp;GAID=18&amp;SessionID=114#SB4063</guid>
   </item>
   <item>
-    <title>SB4064: BUILD Act — Parking reform (caps minimums)</title>
+    <title>SB4064: Parking reform â caps minimum parking requirements</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4064&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
     <guid isPermaLink="true">https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4064&amp;GAID=18&amp;SessionID=114#SB4064</guid>
   </item>
   <item>
-    <title>SB4071: BUILD Act — Legalizes ADUs statewide</title>
+    <title>SB4071: Legalizes accessory dwelling units (ADUs)</title>
     <link>https://www.ilga.gov/legislation/BillStatus.asp?DocTypeID=SB&amp;DocNum=4071&amp;GAID=18&amp;SessionID=114</link>
     <description>On the watchlist. Stance: Proponent. Category: Housing. No hearing scheduled yet.</description>
     <category>Housing</category>
