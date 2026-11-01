@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-01T01:44:52Z",
+  "generated_at": "2026-11-01T18:14:57Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
-  "session_status": "recess",
-  "session_message": "Legislature is in summer recess. Next opportunity: veto session in November. You can still review bills and prepare your slip.",
+  "session_status": "unknown",
+  "session_message": "Session status uncertain — an emergency or special session may be in progress. Check ilga.gov for the current calendar.",
   "bills": []
 }
