@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-10T04:27:46Z",
+  "generated_at": "2026-11-10T20:11:38Z",
   "source_note": "Bill data from OpenStates via govbot. STC priority list auto-synced from chihacknight/govbot. Updated twice daily (8am & 6pm CT).",
-  "session_status": "unknown",
-  "session_message": "Session status uncertain — an emergency or special session may be in progress. Check ilga.gov for the current calendar.",
+  "session_status": "active",
+  "session_message": "Veto session is active (Nov 10–20). Legislators are in Springfield — file your slip!",
   "bills": []
 }
